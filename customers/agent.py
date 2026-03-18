@@ -20,6 +20,7 @@ from google.adk.agents import Agent
 from google.adk.apps import App
 from google.adk.models import Gemini
 from google.adk.tools import LongRunningFunctionTool
+from google.adk.tools.tool_context import ToolContext
 from google.genai import types
 import os
 from vertexai import agent_engines
@@ -27,6 +28,10 @@ from vertexai import agent_engines
 os.environ["GOOGLE_CLOUD_PROJECT"] = "genai-apps-25"
 os.environ["GOOGLE_CLOUD_LOCATION"] = "global"
 os.environ["GOOGLE_GENAI_USE_VERTEXAI"] = "True"
+ENGINE_ID  = os.environ.get(
+    "BOOKINGS_ENGINE_ID",
+    "projects/803095609412/locations/us-central1/reasoningEngines/2993203802829488128"
+)
 
 def request_user_input(message: str) -> dict:
     """Request additional input from the user.
@@ -39,22 +44,23 @@ def request_user_input(message: str) -> dict:
     """
     return {"status": "pending", "message": message}
 
-async def bookings(request: str) -> str:
+async def bookings(request: str, tool_context: ToolContext) -> str:
     """Delegates a booking request to the bookings agent.
     
     Args:
         request: The booking request from the user (e.g., "make a hotel reservation").
     """
+    user_id = tool_context.user_id
     try:
         remote_app = agent_engines.get(
-            "projects/genai-apps-25/locations/us-central1/reasoningEngines/9162713079862001664"
+            ENGINE_ID
         )
-        remote_session = await remote_app.async_create_session(user_id="customer_agent_a2a_user")
+        remote_session = await remote_app.async_create_session(user_id=user_id)
         
         final_text = []
         async for event in remote_app.async_stream_query(
             message=request, 
-            user_id="customer_agent_a2a_user", 
+            user_id=user_id, 
             session_id=remote_session["id"]
         ):
             role = event.get("role") or event.get("content", {}).get("role")

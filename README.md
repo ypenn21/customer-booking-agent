@@ -104,10 +104,22 @@ gcloud projects add-iam-policy-binding genai-apps-25 --member="serviceAccount:se
 uv run uvicorn bookings.agent:a2a_app --reload --port 8000
 ```
 
-2. start customers agent
+2. deploy bookings agent to agent engine
+
+```bash
+uv run python bookings/deploy_agent_engine.py
+```
+
+3. start customers agent
 
 ```bash
 uv run adk web --port 8001
+```
+
+4. deploy customers agent to agent engine
+
+```bash
+uv run python customers/deploy_agent_engine.py
 ```
 
 ```
