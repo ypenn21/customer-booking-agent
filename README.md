@@ -223,20 +223,6 @@ app = App(
 
 ```
 # no a2a
-# Copyright 2026 Google LLC
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 import datetime
 from zoneinfo import ZoneInfo
 
@@ -253,6 +239,8 @@ vertexai.init(project="genai-apps-25", location="us-central1")
 os.environ["GOOGLE_CLOUD_PROJECT"] = "genai-apps-25"
 os.environ["GOOGLE_CLOUD_LOCATION"] = "global"
 os.environ["GOOGLE_GENAI_USE_VERTEXAI"] = "True"
+
+
 
 def request_user_input(message: str) -> dict:
     """Request additional input from the user.
@@ -297,8 +285,18 @@ async def bookings(request: str) -> str:
         return f"Error communicating with bookings agent: {e}"
 
 mock_db = {
-    "alice": {"user_id": "u4398", "email": "alice@example.com", "loyalty_tier": "gold"},
-    "bob": {"user_id": "u1023", "email": "bob@example.com", "loyalty_tier": "silver"},
+    "alice": {"user_id": "u1022", "email": "alice@gmail.com", "loyalty_tier": "gold"},
+    "bob": {"user_id": "u1023", "email": "bob@gmail.com", "loyalty_tier": "silver"},
+    "charlie": {"user_id": "u1024", "email": "charlie@gmail.com", "loyalty_tier": "bronze"},
+    "david": {"user_id": "u1025", "email": "david@gmail.com", "loyalty_tier": "gold"},
+    "eve": {"user_id": "u1026", "email": "eve@gmail.com", "loyalty_tier": "silver"},
+    "frank": {"user_id": "u1027", "email": "frank@gmail.com", "loyalty_tier": "bronze"},
+    "grace": {"user_id": "u1028", "email": "grace@gmail.com", "loyalty_tier": "gold"},
+    "harry": {"user_id": "u1029", "email": "harry@gmail.com", "loyalty_tier": "silver"},
+    "ian": {"user_id": "u1030", "email": "ian@gmail.com", "loyalty_tier": "bronze"},
+    "jane": {"user_id": "u1031", "email": "jane@gmail.com", "loyalty_tier": "gold"},
+    "jack": {"user_id": "u1032", "email": "jack@gmail.com", "loyalty_tier": "silver"},
+    "jill": {"user_id": "u1033", "email": "jill@gmail.com", "loyalty_tier": "bronze"}
 }
 
 def get_customer(name: str) -> dict:
@@ -343,6 +341,4 @@ app = App(
     root_agent=root_agent,
     name="customers",
 )
-
-
 ```

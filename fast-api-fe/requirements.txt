@@ -1,0 +1,7 @@
+fastapi>=0.115.0
+uvicorn[standard]>=0.29.0
+jinja2>=3.1.0
+python-multipart>=0.0.9
+vertexai>=1.130.0
+google-adk>=1.16.0,<2.0.0
+google-cloud-aiplatform[agent-engines]>=1.130.0

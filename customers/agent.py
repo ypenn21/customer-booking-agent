@@ -22,10 +22,8 @@ from google.adk.models import Gemini
 from google.adk.tools import LongRunningFunctionTool
 from google.genai import types
 import os
-import vertexai
 from vertexai import agent_engines
 
-vertexai.init(project="genai-apps-25", location="us-central1")
 os.environ["GOOGLE_CLOUD_PROJECT"] = "genai-apps-25"
 os.environ["GOOGLE_CLOUD_LOCATION"] = "global"
 os.environ["GOOGLE_GENAI_USE_VERTEXAI"] = "True"
