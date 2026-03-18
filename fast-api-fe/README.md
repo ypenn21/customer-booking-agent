@@ -10,20 +10,28 @@ A FastAPI web application that serves:
 ```mermaid
 sequenceDiagram
     participant User as User (Browser)
+    participant IAP as Identity-Aware Proxy
     participant FastAPI as fast-api-fe (Cloud Run)
     participant CustomersAgent as Customers Agent (Agent Engine)
     participant BookingsAgent as Bookings Agent (Agent Engine)
+
+    User->>IAP: Access Chat UI / API
+    alt Not Authenticated
+        IAP-->>User: Redirect to Google Login
+        User->>IAP: Authenticate
+    end
+    IAP->>FastAPI: Forward authenticated request
 
     User->>FastAPI: Chat Message (UI)
     Note over FastAPI: POST /v1/chat/completions
     FastAPI->>CustomersAgent: query_agent(message)
     Note over CustomersAgent: Handles greeting, lookup,<br/>or detects booking intent
-    
+
     alt Needs Booking
         CustomersAgent->>BookingsAgent: Delegate task (A2A via Agent Engine API)
         BookingsAgent-->>CustomersAgent: Booking result
     end
-    
+
     CustomersAgent-->>FastAPI: Final text response
     FastAPI-->>User: Chat Bubble
 ```
@@ -85,6 +93,7 @@ curl -X POST http://localhost:8080/v1/chat/completions \
 ## Docker & Cloud Run
 
 ### 1. Build and Push via Cloud Build
+
 Run this from the **project root** to build the image and push it to Artifact Registry:
 
 ```bash
@@ -94,6 +103,7 @@ gcloud builds submit --config .cloudbuild/build-fast-api-fe.yaml \
 ```
 
 ### 2. Deploy to Cloud Run
+
 Deploy the `latest` image to Cloud Run with the required environment variables:
 
 ```bash
@@ -114,6 +124,7 @@ gcloud run deploy customer-chatbot \
 > **Note on IAP**: For production, remove `--allow-unauthenticated` and attach a Global HTTPS Load Balancer with IAP enabled. See `plans/fast-api-fe.md` for full setup steps.
 >
 > If you encounter "Access Denied" errors when testing IAP, ensure your user has the **IAP-secured Web App User** role:
+>
 > ```bash
 > gcloud projects add-iam-policy-binding genai-apps-25 \
 >   --member="user:your-email@example.com" \
