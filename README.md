@@ -9,7 +9,7 @@ Agent generated with [`googleCloudPlatform/agent-starter-pack`](https://github.c
 booking/
 ├── app/         # Core agent code
 │   ├── agent.py               # Main agent logic
-│   ├── agent_engine_app.py    # Agent Engine application logic
+│   ├── deploy_agent_engine.py    # Agent Engine application logic
 │   └── app_utils/             # App utilities and helpers
 ├── .cloudbuild/               # CI/CD pipeline configurations for Google Cloud Build
 ├── deployment/                # Infrastructure and deployment scripts
@@ -95,11 +95,11 @@ See the [A2A Inspector docs](https://github.com/a2aproject/a2a-inspector) for de
 1. start bookings agent
 
 ```bash
-uv run adk api_server bookings/
+uv run uvicorn bookings.agent:a2a_app --reload --port 8000
 ```
 
 2. start customers agent
 
 ```bash
-uv run adk run customers/
+uv run adk web --port 8001
 ```

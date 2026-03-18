@@ -22,8 +22,7 @@ from typing import TYPE_CHECKING, Any
 
 from starlette.requests import Request
 
-if TYPE_CHECKING:
-    from app.agent_engine_app import AgentEngineApp
+
 
 # Test constants
 POLL_MAX_ATTEMPTS = 30
@@ -97,7 +96,7 @@ def build_get_request(path_params: dict[str, str] | None) -> Request:
 
 
 async def poll_task_completion(
-    agent_app: "AgentEngineApp",
+    agent_app: Any,
     task_id: str,
     max_attempts: int = POLL_MAX_ATTEMPTS,
     interval: float = POLL_INTERVAL_SECONDS,

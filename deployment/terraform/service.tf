@@ -64,7 +64,7 @@ resource "google_vertex_ai_reasoning_engine" "app" {
       }
 
       python_spec {
-        entrypoint_module  = "app.agent_engine_app"
+        entrypoint_module  = "bookings.deploy_agent_engine"
         entrypoint_object  = "agent_engine"
         requirements_file  = "app/app_utils/.requirements.txt"
         version            = "3.12"

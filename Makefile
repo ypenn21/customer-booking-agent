@@ -81,13 +81,25 @@ build-inspector-if-needed:
 # Usage: make deploy [AGENT_IDENTITY=true] [SECRETS="KEY=SECRET_ID,..."] - Set AGENT_IDENTITY=true to enable per-agent IAM identity (Preview)
 deploy:
 	# Export dependencies to requirements file using uv export.
-	(uv export --no-hashes --no-header --no-dev --no-emit-project --no-annotate > app/app_utils/.requirements.txt 2>/dev/null || \
-	uv export --no-hashes --no-header --no-dev --no-emit-project > app/app_utils/.requirements.txt) && \
-	uv run -m app.app_utils.deploy \
-		--source-packages=./app \
-		--entrypoint-module=app.agent_engine_app \
+	(uv export --no-hashes --no-header --no-dev --no-emit-project --no-annotate > bookings/app_utils/.requirements.txt 2>/dev/null || \
+	uv export --no-hashes --no-header --no-dev --no-emit-project > bookings/app_utils/.requirements.txt) && \
+	uv run -m bookings.app_utils.deploy \
+		--source-packages=./bookings \
+		--entrypoint-module=bookings.deploy_agent_engine \
 		--entrypoint-object=agent_engine \
-		--requirements-file=app/app_utils/.requirements.txt \
+		--requirements-file=bookings/app_utils/.requirements.txt \
+		$(if $(AGENT_IDENTITY),--agent-identity) \
+		$(if $(filter command line,$(origin SECRETS)),--set-secrets="$(SECRETS)")
+
+deploy-customers:
+	# Export dependencies to requirements file using uv export.
+	(uv export --no-hashes --no-header --no-dev --no-emit-project --no-annotate > bookings/app_utils/.requirements.txt 2>/dev/null || \
+	uv export --no-hashes --no-header --no-dev --no-emit-project > bookings/app_utils/.requirements.txt) && \
+	uv run -m bookings.app_utils.deploy \
+		--source-packages=./customers \
+		--entrypoint-module=customers.deploy_agent_engine \
+		--entrypoint-object=agent_engine \
+		--requirements-file=bookings/app_utils/.requirements.txt \
 		$(if $(AGENT_IDENTITY),--agent-identity) \
 		$(if $(filter command line,$(origin SECRETS)),--set-secrets="$(SECRETS)")
 
@@ -110,7 +122,7 @@ setup-dev-env:
 # Run unit and integration tests
 test:
 	uv sync --dev
-	uv run pytest tests/unit && uv run pytest tests/integration
+	uv run python -m pytest tests/unit && uv run python -m pytest tests/integration
 
 # ==============================================================================
 # Agent Evaluation

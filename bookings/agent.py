@@ -31,7 +31,7 @@ from a2a.server.apps.jsonrpc.starlette_app import A2AStarletteApplication
 from a2a.server.request_handlers import DefaultRequestHandler
 from a2a.server.tasks import InMemoryTaskStore
 from .agent_executor import AdkAgentToA2AExecutor
-
+from vertexai.agent_engines import AdkApp
 _, project_id = google.auth.default()
 os.environ["GOOGLE_CLOUD_PROJECT"] = project_id
 os.environ["GOOGLE_CLOUD_LOCATION"] = "global"
@@ -95,9 +95,8 @@ root_agent = Agent(
     ],
 )
 
-app = App(
-    root_agent=root_agent,
-    name="bookings",
+app = AdkApp(
+    agent=root_agent,
 )
 
 capabilities = AgentCapabilities(streaming=True)
@@ -106,7 +105,7 @@ skill = AgentSkill(
     name="Bookings Assistant",
     description="Assists in making custom bookings and reservations.",
     tags=["bookings", "reservations"],
-    examples=["Make a booking for massage tomorrow at 10am."],
+    examples=["Make a booking for alice on 04/04/2026 to 04/05/2026 arriving at 10am for a hotel in Sydney."],
 )
 
 agent_card = AgentCard(

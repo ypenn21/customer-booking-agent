@@ -195,7 +195,7 @@ def setup_agent_identity(client: Any, project: str, display_name: str) -> Any:
 )
 @click.option(
     "--entrypoint-module",
-    default="app.agent_engine_app",
+    default="bookings.deploy_agent_engine",
     help="Python module path for the agent entrypoint (required)",
 )
 @click.option(
@@ -268,7 +268,7 @@ def setup_agent_identity(client: Any, project: str, display_name: str) -> Any:
     default=False,
     help="Enable agent identity for per-agent IAM access control (Preview feature)",
 )
-def deploy_agent_engine_app(
+def deploy_agent_engine(
     project: str | None,
     location: str,
     display_name: str,
@@ -432,4 +432,4 @@ def deploy_agent_engine_app(
 
 
 if __name__ == "__main__":
-    deploy_agent_engine_app()
+    deploy_agent_engine()
