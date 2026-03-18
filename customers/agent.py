@@ -21,15 +21,14 @@ from google.adk.apps import App
 from google.adk.models import Gemini
 from google.adk.tools import LongRunningFunctionTool
 from google.genai import types
-
 import os
-import google.auth
+import vertexai
+from vertexai import agent_engines
 
-_, project_id = google.auth.default()
+vertexai.init(project="genai-apps-25", location="us-central1")
 os.environ["GOOGLE_CLOUD_PROJECT"] = "genai-apps-25"
 os.environ["GOOGLE_CLOUD_LOCATION"] = "global"
 os.environ["GOOGLE_GENAI_USE_VERTEXAI"] = "True"
-
 
 def request_user_input(message: str) -> dict:
     """Request additional input from the user.
@@ -42,13 +41,36 @@ def request_user_input(message: str) -> dict:
     """
     return {"status": "pending", "message": message}
 
-from google.adk.tools import AgentTool
-from google.adk.agents.remote_a2a_agent import RemoteA2aAgent
-
-bookings_agent = RemoteA2aAgent(
-    "bookings",
-    agent_card=os.getenv("BOOKINGS_AGENT_CARD_URL", "http://127.0.0.1:8000/.well-known/agent-card.json")
-)
+async def bookings(request: str) -> str:
+    """Delegates a booking request to the bookings agent.
+    
+    Args:
+        request: The booking request from the user (e.g., "make a hotel reservation").
+    """
+    try:
+        remote_app = agent_engines.get(
+            "projects/genai-apps-25/locations/us-central1/reasoningEngines/9162713079862001664"
+        )
+        remote_session = await remote_app.async_create_session(user_id="customer_agent_a2a_user")
+        
+        final_text = []
+        async for event in remote_app.async_stream_query(
+            message=request, 
+            user_id="customer_agent_a2a_user", 
+            session_id=remote_session["id"]
+        ):
+            role = event.get("role") or event.get("content", {}).get("role")
+            if role == "model":
+                parts = event.get("content", {}).get("parts", [])
+                for part in parts:
+                    if "text" in part:
+                        final_text.append(part["text"])
+                        
+        if final_text:
+            return "\n".join(final_text)
+        return "The bookings agent finished but provided no text response."
+    except Exception as e:
+        return f"Error communicating with bookings agent: {e}"
 
 mock_db = {
     "alice": {"user_id": "u4398", "email": "alice@example.com", "loyalty_tier": "gold"},
@@ -88,7 +110,7 @@ root_agent = Agent(
     tools=[
         get_customer,
         get_all_customers,
-        AgentTool(bookings_agent),
+        bookings,
         LongRunningFunctionTool(func=request_user_input),
     ],
 )
