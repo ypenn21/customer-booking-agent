@@ -90,6 +90,12 @@ See the [observability guide](https://googlecloudplatform.github.io/agent-starte
 This agent supports the [A2A Protocol](https://a2a-protocol.org/). Use `make inspector` to test interoperability.
 See the [A2A Inspector docs](https://github.com/a2aproject/a2a-inspector) for details.
 
+## Add Permission to Agent Engine Default SA
+
+```bash
+gcloud projects add-iam-policy-binding genai-apps-25 --member="serviceAccount:service-803095609412@gcp-sa-aiplatform-re.iam.gserviceaccount.com" --role="roles/aiplatform.user"
+```
+
 ## How to Run:
 
 1. start bookings agent
