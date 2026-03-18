@@ -5,6 +5,29 @@ A FastAPI web application that serves:
 - **Chat UI** — modern dark-mode single-page UI at `GET /`
 - **OpenAI-compatible API** — `POST /v1/chat/completions` that proxies to the `customers` ADK agent on Vertex AI Agent Engine
 
+## Architecture
+
+```mermaid
+sequenceDiagram
+    participant User as User (Browser)
+    participant FastAPI as fast-api-fe (Cloud Run)
+    participant CustomersAgent as Customers Agent (Agent Engine)
+    participant BookingsAgent as Bookings Agent (Agent Engine)
+
+    User->>FastAPI: Chat Message (UI)
+    Note over FastAPI: POST /v1/chat/completions
+    FastAPI->>CustomersAgent: query_agent(message)
+    Note over CustomersAgent: Handles greeting, lookup,<br/>or detects booking intent
+    
+    alt Needs Booking
+        CustomersAgent->>BookingsAgent: Delegate task (A2A via Agent Engine API)
+        BookingsAgent-->>CustomersAgent: Booking result
+    end
+    
+    CustomersAgent-->>FastAPI: Final text response
+    FastAPI-->>User: Chat Bubble
+```
+
 ## Project Structure
 
 ```
@@ -61,34 +84,41 @@ curl -X POST http://localhost:8080/v1/chat/completions \
 
 ## Docker & Cloud Run
 
+### 1. Build and Push via Cloud Build
+Run this from the **project root** to build the image and push it to Artifact Registry:
+
 ```bash
-# Build
-docker build -t chatbot:local ./fast-api-fe
+# Substitutions are used for the image tag
+gcloud builds submit --config .cloudbuild/build-fast-api-fe.yaml \
+  --substitutions=COMMIT_SHA=$(git rev-parse HEAD) .
+```
 
-# Run locally
-docker run -p 8080:8080 \
-  -e PROJECT_ID=genai-apps-25 \
-  -e CUSTOMERS_ENGINE_ID=projects/genai-apps-25/locations/us-central1/reasoningEngines/<RESOURCE_ID> \
-  chatbot:local
+### 2. Deploy to Cloud Run
+Deploy the `latest` image to Cloud Run with the required environment variables:
 
-# Deploy to Cloud Run (IAP-protected)
+```bash
 PROJECT_ID=genai-apps-25
 REGION=us-central1
-IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/fast-api-fe/chatbot:latest"
-
-docker build -t $IMAGE ./fast-api-fe && docker push $IMAGE
+IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/adk/fast-api-fe:latest"
+CUSTOMERS_ENGINE_ID="projects/genai-apps-25/locations/us-central1/reasoningEngines/5452169199373778944"
 
 gcloud run deploy customer-chatbot \
   --image=$IMAGE \
   --region=$REGION \
-  --no-allow-unauthenticated \
+  --allow-unauthenticated \
   --port=8080 \
-  --set-env-vars="PROJECT_ID=${PROJECT_ID},LOCATION=${REGION},CUSTOMERS_ENGINE_ID=..." \
-  --service-account=<SA_EMAIL> \
+  --set-env-vars="PROJECT_ID=${PROJECT_ID},LOCATION=${REGION},CUSTOMERS_ENGINE_ID=${CUSTOMERS_ENGINE_ID}" \
   --memory=512Mi --cpu=1
 ```
 
-> **IAP**: Attach a Global HTTPS Load Balancer → Serverless NEG → Cloud Run, then enable IAP on the backend service. See `plans/fast-api-fe.md` for full setup steps.
+> **Note on IAP**: For production, remove `--allow-unauthenticated` and attach a Global HTTPS Load Balancer with IAP enabled. See `plans/fast-api-fe.md` for full setup steps.
+>
+> If you encounter "Access Denied" errors when testing IAP, ensure your user has the **IAP-secured Web App User** role:
+> ```bash
+> gcloud projects add-iam-policy-binding genai-apps-25 \
+>   --member="user:your-email@example.com" \
+>   --role="roles/iap.httpsResourceAccessor"
+> ```
 
 ## Environment Variables
 
