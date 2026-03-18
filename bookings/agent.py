@@ -26,7 +26,7 @@ import os
 import google.auth
 from fastapi import FastAPI
 
-from a2a.types import AgentCard, AgentCapabilities, AgentSkill
+from a2a.types import AgentCard, AgentCapabilities, AgentSkill, TransportProtocol
 from a2a.server.apps.jsonrpc.starlette_app import A2AStarletteApplication
 from a2a.server.request_handlers import DefaultRequestHandler
 from a2a.server.tasks import InMemoryTaskStore
@@ -99,7 +99,7 @@ app = AdkApp(
     agent=root_agent,
 )
 
-capabilities = AgentCapabilities(streaming=True)
+capabilities = AgentCapabilities(streaming=False)
 skill = AgentSkill(
     id="bookings_assistant",
     name="Bookings Assistant",
@@ -117,6 +117,7 @@ agent_card = AgentCard(
     defaultOutputModes=["text"],
     capabilities=capabilities,
     skills=[skill],
+    preferredTransport=TransportProtocol.http_json,
 )
 
 request_handler = DefaultRequestHandler(
