@@ -3,7 +3,13 @@
 ReAct agent with A2A protocol [experimental]
 Agent generated with [`googleCloudPlatform/agent-starter-pack`](https://github.com/GoogleCloudPlatform/agent-starter-pack) version `0.39.3`
 
+
+## Architecture
+
+![Architecture Diagram](architecture-diagrams/architecture-diagram-customer-bookings.png)
+
 ## Project Structure
+
 
 ```
 booking/
