@@ -29,8 +29,8 @@ os.environ["GOOGLE_CLOUD_PROJECT"] = "genai-apps-25"
 os.environ["GOOGLE_CLOUD_LOCATION"] = "global"
 os.environ["GOOGLE_GENAI_USE_VERTEXAI"] = "True"
 ENGINE_ID  = os.environ.get(
-    "BOOKINGS_ENGINE_ID",
-    "projects/803095609412/locations/us-central1/reasoningEngines/2993203802829488128"
+    "CUSTOMERS_ENGINE_ID",
+    "projects/genai-apps-25/locations/us-central1/reasoningEngines/9102899647310987264"
 )
 
 def request_user_input(message: str) -> dict:

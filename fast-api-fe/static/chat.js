@@ -14,6 +14,12 @@
 /** @type {{ role: "system"|"user"|"assistant", content: string }[]} */
 let messages = [];
 
+/**
+ * True only for the very first message after "New Chat" was clicked.
+ * Signals the backend to create a brand-new Agent Engine session.
+ */
+let forceNewSession = false;
+
 // ── DOM refs ───────────────────────────────────────────────────────────────────
 const feed          = document.getElementById("messages-container");
 const welcome       = document.getElementById("welcome-screen");
@@ -102,15 +108,17 @@ function removeTyping() {
 
 /**
  * POST to /v1/chat/completions (OpenAI-compatible).
+ * @param {boolean} [newSession=false] - If true, instructs backend to start a fresh session.
  * @returns {Promise<string>} the assistant's reply content
  */
-async function fetchCompletion() {
+async function fetchCompletion(newSession = false) {
   const response = await fetch("/v1/chat/completions", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       model: "customers-agent",
       messages,
+      force_new_session: newSession,
     }),
   });
 
@@ -146,8 +154,12 @@ async function sendMessage(text) {
   // Show typing indicator
   showTyping();
 
+  // Capture & clear the flag so only the first post-reset message forces a new session
+  const isNew = forceNewSession;
+  forceNewSession = false;
+
   try {
-    const reply = await fetchCompletion();
+    const reply = await fetchCompletion(isNew);
     removeTyping();
     messages.push({ role: "assistant", content: reply });
     appendBubble("assistant", reply);
@@ -161,7 +173,17 @@ async function sendMessage(text) {
 
 // ── Reset ──────────────────────────────────────────────────────────────────────
 
-function startNewChat() {
+async function startNewChat() {
+  // Tell the backend to discard the current Agent Engine session
+  try {
+    await fetch("/v1/sessions/new", { method: "POST" });
+  } catch (err) {
+    console.warn("Could not reset backend session:", err);
+  }
+
+  // Mark that the next message should start a fresh session (belt-and-suspenders)
+  forceNewSession = true;
+
   messages = [];
   // Clear message rows but keep the welcome screen element
   [...feed.children].forEach(child => {

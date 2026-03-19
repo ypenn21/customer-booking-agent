@@ -24,6 +24,7 @@ class ChatCompletionRequest(BaseModel):
     stream: bool = False
     temperature: Optional[float] = None
     max_tokens: Optional[int] = None
+    force_new_session: bool = False  # If True, discard existing session and start fresh
 
 
 class ChatChoice(BaseModel):

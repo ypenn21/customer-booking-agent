@@ -23,7 +23,7 @@ def main():
     environment_variables = {
         "GOOGLE_GENAI_USE_VERTEXAI": "TRUE",
         "GOOGLE_CLOUD_LOCATION": "us-central1",
-        "BOOKINGS_AGENT_CARD_URL": "https://us-central1-aiplatform.googleapis.com/v1/projects/genai-apps-25/locations/us-central1/reasoningEngines/9162713079862001664"
+        "CUSTOMERS_ENGINE_ID": "projects/genai-apps-25/locations/us-central1/reasoningEngines/9102899647310987264"
     }
 
     # Create the agent engine

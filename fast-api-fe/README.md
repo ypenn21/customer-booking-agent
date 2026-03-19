@@ -110,7 +110,7 @@ Deploy the `latest` image to Cloud Run with the required environment variables:
 PROJECT_ID=genai-apps-25
 REGION=us-central1
 IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/adk/fast-api-fe:latest"
-CUSTOMERS_ENGINE_ID="projects/genai-apps-25/locations/us-central1/reasoningEngines/5452169199373778944"
+CUSTOMERS_ENGINE_ID="projects/genai-apps-25/locations/us-central1/reasoningEngines/4698379211742642176"
 
 gcloud run deploy customer-chatbot \
   --image=$IMAGE \
