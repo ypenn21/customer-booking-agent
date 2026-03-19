@@ -205,7 +205,7 @@ def setup_agent_identity(client: Any, project: str, display_name: str) -> Any:
 )
 @click.option(
     "--requirements-file",
-    default="app/app_utils/.requirements.txt",
+    default="deployment/.requirements.txt",
     help="Path to requirements.txt file",
 )
 @click.option(

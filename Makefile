@@ -81,25 +81,31 @@ build-inspector-if-needed:
 # Usage: make deploy [AGENT_IDENTITY=true] [SECRETS="KEY=SECRET_ID,..."] - Set AGENT_IDENTITY=true to enable per-agent IAM identity (Preview)
 deploy:
 	# Export dependencies to requirements file using uv export.
-	(uv export --no-hashes --no-header --no-dev --no-emit-project --no-annotate > bookings/app_utils/.requirements.txt 2>/dev/null || \
-	uv export --no-hashes --no-header --no-dev --no-emit-project > bookings/app_utils/.requirements.txt) && \
-	uv run -m bookings.app_utils.deploy \
+	(uv export --no-hashes --no-header --no-dev --no-emit-project --no-annotate > deployment/.requirements.txt 2>/dev/null || \
+	uv export --no-hashes --no-header --no-dev --no-emit-project > deployment/.requirements.txt) && \
+	uv run -m deployment.agent_engine.deploy \
+		--display-name="Booking Assistant" \
+		--description="Assists in making custom bookings and reservations." \
 		--source-packages=./bookings \
 		--entrypoint-module=bookings.deploy_agent_engine \
 		--entrypoint-object=agent_engine \
-		--requirements-file=bookings/app_utils/.requirements.txt \
+		--requirements-file=deployment/.requirements.txt \
+		--set-env-vars="GOOGLE_GENAI_USE_VERTEXAI=TRUE" \
 		$(if $(AGENT_IDENTITY),--agent-identity) \
 		$(if $(filter command line,$(origin SECRETS)),--set-secrets="$(SECRETS)")
 
 deploy-customers:
 	# Export dependencies to requirements file using uv export.
-	(uv export --no-hashes --no-header --no-dev --no-emit-project --no-annotate > bookings/app_utils/.requirements.txt 2>/dev/null || \
-	uv export --no-hashes --no-header --no-dev --no-emit-project > bookings/app_utils/.requirements.txt) && \
-	uv run -m bookings.app_utils.deploy \
+	(uv export --no-hashes --no-header --no-dev --no-emit-project --no-annotate > deployment/.requirements.txt 2>/dev/null || \
+	uv export --no-hashes --no-header --no-dev --no-emit-project > deployment/.requirements.txt) && \
+	uv run -m deployment.agent_engine.deploy \
+		--display-name="Customer Assistant" \
+		--description="Assists in finding customer details and making bookings for each customer." \
 		--source-packages=./customers \
 		--entrypoint-module=customers.deploy_agent_engine \
 		--entrypoint-object=agent_engine \
-		--requirements-file=bookings/app_utils/.requirements.txt \
+		--requirements-file=deployment/.requirements.txt \
+		--set-env-vars="GOOGLE_GENAI_USE_VERTEXAI=TRUE,GOOGLE_CLOUD_LOCATION=global" \
 		$(if $(AGENT_IDENTITY),--agent-identity) \
 		$(if $(filter command line,$(origin SECRETS)),--set-secrets="$(SECRETS)")
 
