@@ -1,14 +1,30 @@
 import os
 import sys
 import vertexai
+from vertexai import agent_engines
 
 # Add the project root to the Python path to allow for absolute imports
 # This assumes deploy_agent_engine.py is inside bookings directory.
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from vertexai.preview.reasoning_engines import A2aAgent
-from bookings.agent import agent_card, root_agent, app
-from bookings.agent_executor import AdkAgentToA2AExecutor
+from bookings.agent import app
+
+DISPLAY_NAME = "Booking Assistant"
+
+REQUIREMENTS = [
+    "google-cloud-aiplatform[agent_engines]>=1.130.0",
+    "google-adk>=1.16.0,<2.0.0",
+    "a2a-sdk~=0.3.22",
+    "nest-asyncio>=1.6.0,<2.0.0",
+    "opentelemetry-instrumentation-google-genai>=0.1.0,<1.0.0",
+    "gcsfs>=2024.11.0",
+    "google-cloud-logging>=3.12.0,<4.0.0",
+    "protobuf>=6.31.1,<7.0.0",
+]
+
+EXTRA_PACKAGES = ["bookings"]
+
+DESCRIPTION = "Assists in making custom bookings and reservations."
 
 
 def main():
@@ -22,92 +38,50 @@ def main():
 
     vertexai.init(project=project_id, location=location, staging_bucket=staging_bucket)
 
-    print("Deploying A2A-enabled bookings agent to Agent Engine...")
     environment_variables = {
         "GOOGLE_GENAI_USE_VERTEXAI": "TRUE",
+        "GOOGLE_CLOUD_LOCATION": "us-central1",
+        # Enable OpenTelemetry traces and logs for Agent Engine observability.
+        # GOOGLE_CLOUD_AGENT_ENGINE_ENABLE_TELEMETRY enables agent traces and logs
+        # (does NOT include prompt/response content by default).
+        # OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT also logs the full
+        # input prompts and output responses — disable if you want to avoid PII.
+        "GOOGLE_CLOUD_AGENT_ENGINE_ENABLE_TELEMETRY": "true",
+        "OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT": "true",
     }
 
-    # A2aAgent exposes proper A2A endpoints (on_message_send, on_get_task,
-    # handle_authenticated_agent_card) on Agent Engine — unlike AdkApp which
-    # only exposes ADK streaming query methods with no A2A support.
-    #
-    # agent_executor_builder MUST be a lambda (not a constructed instance) so
-    # the executor is built inside the remote container, not pickled locally.
-    # a2a_agent = A2aAgent(
-    #     agent_card=agent_card,
-    #     agent_executor_builder=lambda: AdkAgentToA2AExecutor(root_agent),
-    # )
+    # Check for an existing agent engine with the same display name
+    existing = None
+    print(f"Searching for existing Agent Engine with display_name='{DISPLAY_NAME}'...")
+    for engine in agent_engines.list():
+        if engine.display_name == DISPLAY_NAME:
+            existing = engine
+            print(f"Found existing Agent Engine: {engine.resource_name}")
+            break
 
-    remote_app = vertexai.agent_engines.create(
-        app,
-        requirements=[
-            "google-cloud-aiplatform[agent_engines]>=1.130.0",
-            "google-adk>=1.16.0,<2.0.0",
-            "a2a-sdk~=0.3.22",
-            "nest-asyncio>=1.6.0,<2.0.0",
-            "opentelemetry-instrumentation-google-genai>=0.1.0,<1.0.0",
-            "gcsfs>=2024.11.0",
-            "google-cloud-logging>=3.12.0,<4.0.0",
-            "protobuf>=6.31.1,<7.0.0",
-        ],
-        extra_packages=["bookings"],
-        display_name="Booking Assistant",
-        description="Assists in making custom bookings and reservations.",
-        env_vars=environment_variables,
-    )
-    print(f"Agent Engine Remote App created: {remote_app.resource_name}")
+    if existing is not None:
+        print(f"Updating existing Agent Engine: {existing.resource_name}")
+        remote_app = existing.update(
+            agent_engine=app,
+            requirements=REQUIREMENTS,
+            extra_packages=EXTRA_PACKAGES,
+            display_name=DISPLAY_NAME,
+            description=DESCRIPTION,
+            env_vars=environment_variables,
+        )
+        print(f"Agent Engine updated: {remote_app.resource_name}")
+    else:
+        print(f"No existing Agent Engine found. Creating new '{DISPLAY_NAME}'...")
+        remote_app = agent_engines.create(
+            app,
+            requirements=REQUIREMENTS,
+            extra_packages=EXTRA_PACKAGES,
+            display_name=DISPLAY_NAME,
+            description=DESCRIPTION,
+            env_vars=environment_variables,
+        )
+        print(f"Agent Engine created: {remote_app.resource_name}")
 
-
-if __name__ == "__main__":
-    main()
-
-import os
-import sys
-import vertexai
-from vertexai import agent_engines
-# Add the project root to the Python path to allow for absolute imports
-# This assumes deploy_agent_engine.py is inside bookings directory.
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from bookings.agent import app
-
-def main():
-    project_id = os.environ.get("PROJECT_ID", "genai-apps-25")
-    location = "us-central1" # Assuming this is the desired location
-    staging_bucket = os.environ.get("STAGING_BUCKET", f"gs://{project_id}-adk-staging")
-
-    if not project_id:
-        print("Error: PROJECT_ID environment variable not set.")
-        sys.exit(1)
-
-    vertexai.init(project=project_id, location=location, staging_bucket=staging_bucket)
-
-    print("Attempting to create/get Agent Engine Remote App...")
-    environment_variables = {
-        "GOOGLE_GENAI_USE_VERTEXAI": "TRUE",
-    }
-
-    # Create the agent engine
-    # We need to pass the bookings package so that the remote environment
-    # has access to all needed class definition.
-    remote_app = agent_engines.create(
-        app,
-        requirements=[
-            "google-adk>=1.16.0,<2.0.0",
-            "a2a-sdk~=0.3.22",
-            "nest-asyncio>=1.6.0,<2.0.0",
-            "opentelemetry-instrumentation-google-genai>=0.1.0,<1.0.0",
-            "gcsfs>=2024.11.0",
-            "google-cloud-logging>=3.12.0,<4.0.0",
-            "google-cloud-aiplatform[evaluation,agent-engines]>=1.130.0",
-            "protobuf>=6.31.1,<7.0.0",
-        ],
-        extra_packages=["bookings"],
-        display_name="Booking Assistant",
-        description="Assists in making custom bookings and reservations.",
-        env_vars=environment_variables,
-    )
-    print(f"Agent Engine Remote App created: {remote_app.resource_name}")
 
 if __name__ == "__main__":
     main()
