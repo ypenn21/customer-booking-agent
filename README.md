@@ -21,7 +21,6 @@ booking/
 ├── deployment/                # Infrastructure and deployment scripts
 ├── notebooks/                 # Jupyter notebooks for prototyping and evaluation
 ├── tests/                     # Unit, integration, and load tests
-├── GEMINI.md                  # AI-assisted development guide
 ├── Makefile                   # Development commands
 └── pyproject.toml             # Project dependencies
 ```
