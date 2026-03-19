@@ -1,4 +1,4 @@
-# booking
+# customer-booking-agent
 
 ReAct agent using Vertex AI Agent Engine REST API — customers agent calls bookings agent via Agent Engine REST API
 generated with [`googleCloudPlatform/agent-starter-pack`](https://github.com/GoogleCloudPlatform/agent-starter-pack) version `0.39.3`
@@ -38,18 +38,28 @@ sequenceDiagram
 
 ## Project Structure
 
-```
-booking/
-├── app/         # Core agent code
-│   ├── agent.py               # Main agent logic
-│   ├── deploy_agent_engine.py    # Agent Engine application logic
-│   └── app_utils/             # App utilities and helpers
-├── .cloudbuild/               # CI/CD pipeline configurations for Google Cloud Build
-├── deployment/                # Infrastructure and deployment scripts
-├── notebooks/                 # Jupyter notebooks for prototyping and evaluation
-├── tests/                     # Unit, integration, and load tests
-├── Makefile                   # Development commands
-└── pyproject.toml             # Project dependencies
+```text
+customer-booking-agent/
+├── bookings/               # Bookings Agent (ADK/A2A app)
+│   ├── agent.py            # Agent definition & ADK/A2A/FastAPI app
+│   ├── agent_executor.py   # A2A adapter (Reasoning Engine wrapper)
+│   └── deploy_agent_engine.py # deploy bookings agent to agent engine
+├── customers/              # Customer Agent (Orchestrator)
+│   ├── agent.py            # Main orchestrator logic
+│   ├── app.py              # AdkApp wrapper
+│   └── deploy_agent_engine.py # deploy customers agent to agent engine
+├── fast-api-fe/            # Web Chat Interface (FastAPI)
+│   ├── main.py             # App entry point
+│   ├── routers/            # OpenAI-compatible API routes
+│   └── services/           # Client for Agent Engine
+├── deployment/             # Infrastructure & Deploy Utils
+│   ├── agent_engine/       # Shared deployment scripts
+│   └── terraform/          # GCP resource provisioning
+├── architecture-diagrams/  # Architecture diagrams and assets
+├── plans/                  # Implementation plans and documentation
+├── tests/                  # Unit and integration tests
+├── Makefile                # Project-wide development commands
+└── pyproject.toml          # Root dependencies
 ```
 
 > 💡 **Tip:** Use [Gemini CLI](https://github.com/google-gemini/gemini-cli) for AI-assisted development - project context is pre-configured in `GEMINI.md`.
@@ -125,6 +135,7 @@ See the [A2A Inspector docs](https://github.com/a2aproject/a2a-inspector) for de
 ## JWT Claims & User Context
 
 The application extracts all claims from the Identity-Aware Proxy (IAP) JWT token and forwards them to the agents. This provides:
+
 - **User Identity**: Stable unique IDs (`sub`) and emails.
 - **Access Levels**: Google Cloud Access Context Manager levels.
 - **Custom Attributes**: Roles, tiers, and departments (via GCIP/Firebase).
@@ -137,33 +148,97 @@ Detailed information on how these claims are passed and handled can be found in 
 gcloud projects add-iam-policy-binding genai-apps-25 --member="serviceAccount:service-803095609412@gcp-sa-aiplatform-re.iam.gserviceaccount.com" --role="roles/aiplatform.user"
 ```
 
-## How to Run:
+## How to Run Local and Deploy To Agent Engine:
 
-1. start bookings agent
-
-```bash
-uv run uvicorn bookings.agent:a2a_app --reload --port 8000
-```
-
-2. deploy bookings agent to agent engine
+1. deploy bookings agent to agent engine
 
 ```bash
 uv run python bookings/deploy_agent_engine.py
 ```
 
-3. start customers agent
+2. start customers agent (ensure `BOOKINGS_ENGINE_ID` is set to your deployed customer agent)
 
 ```bash
 uv run adk web --port 8001
 ```
 
-4. deploy customers agent to agent engine
+3. deploy customers agent to agent engine (ensure `BOOKINGS_ENGINE_ID` is set to your deployed customer agent)
 
 ```bash
 uv run python customers/deploy_agent_engine.py
 ```
 
-5. run the fast-api-fe chat UI — see [fast-api-fe/README.md](fast-api-fe/README.md) for local dev and Cloud Run deployment instructions.
+4. Launch the web interface (ensure `CUSTOMERS_ENGINE_ID` is set to your deployed customer agent):
+
+```bash
+uv run uvicorn fast-api-fe.main:app --reload --port 8080
+```
+
+\*more details on how to run & deploy fast-api-fe chat UI — see [fast-api-fe/README.md](fast-api-fe/README.md) for local dev and Cloud Run deployment instructions.
+
+## Deployment to Vertex AI
+
+\*Note make files haven't been fully tested yet. Please use the manual steps above for now.
+
+### 1. Set up Infrastructure
+
+Initialize GCP resources (Bucket, IAM, etc.):
+
+```bash
+make setup-dev-env
+```
+
+### 2. Deploy Agents
+
+Deploy both agents to Vertex AI Agent Engine (Reasoning Engine):
+
+```bash
+make deploy            # Deploys Bookings Agent
+make deploy-customers  # Deploys Customers Agent
+```
+
+### 3. Deploy Frontend
+
+See [fast-api-fe/README.md](fast-api-fe/README.md) for full Cloud Run deployment instructions.
+
+---
+
+## Architecture Notes
+
+### How `query_agent` Communicates with Agent Engine
+
+`fast-api-fe/services/agent_client.py` uses the **Vertex AI Agent Engine REST API** via the `vertexai` Python SDK — **not** A2A.
+
+```
+FastAPI app (Cloud Run)
+    ↓
+vertexai Python SDK (google-cloud-aiplatform)
+    ↓  HTTPS REST calls to aiplatform.googleapis.com
+Agent Engine (deployed reasoning engine)
+```
+
+| Call                                   | What it does                                                  |
+| -------------------------------------- | ------------------------------------------------------------- |
+| `agent_engines.get(ENGINE_ID)`         | Returns a **local Python proxy object** — no network call yet |
+| `remote_app.async_create_session(...)` | `POST .../reasoningEngines/{id}/sessions`                     |
+| `remote_app.async_stream_query(...)`   | `POST .../reasoningEngines/{id}:streamQuery`                  |
+
+**Is the connection private?**  
+By default, calls go to `aiplatform.googleapis.com` (a public Google API endpoint). However, traffic from Cloud Run → Google APIs travels over Google's internal infrastructure (GFE), not the raw public internet. Fully private routing can be enforced with **VPC Service Controls** or **Private Google Access**.
+
+### A2A vs. Agent Engine API — Two Different Hops
+
+```
+FastAPI frontend
+    ↓  Vertex AI SDK / REST    ← agent_client.py uses THIS
+customers agent (Agent Engine)
+    ↓  Vertex AI SDK / Rest    ← customers/agent.py uses THIS.. A2A not fully implemented on customers & bookings agents
+bookings agent (Agent Engine)
+```
+
+- **`agent_client.py`** → Vertex AI Agent Engine API (session + streaming query)
+- **`customers/agent.py`** →Vertex AI SDK (session + streaming query)
+- **`customers/agent.py`** → can try A2A protocol via `AuthedRemoteA2aAgent` → bookings agent e.g. below
 
 ```
 # a2a snippet for bookings agent.. currently not using a2a
@@ -275,41 +350,3 @@ app = App(
 )
 
 ```
-
----
-
-## Architecture Notes
-
-### How `query_agent` Communicates with Agent Engine
-
-`fast-api-fe/services/agent_client.py` uses the **Vertex AI Agent Engine REST API** via the `vertexai` Python SDK — **not** A2A.
-
-```
-FastAPI app (Cloud Run)
-    ↓
-vertexai Python SDK (google-cloud-aiplatform)
-    ↓  HTTPS REST calls to aiplatform.googleapis.com
-Agent Engine (deployed reasoning engine)
-```
-
-| Call                                   | What it does                                                  |
-| -------------------------------------- | ------------------------------------------------------------- |
-| `agent_engines.get(ENGINE_ID)`         | Returns a **local Python proxy object** — no network call yet |
-| `remote_app.async_create_session(...)` | `POST .../reasoningEngines/{id}/sessions`                     |
-| `remote_app.async_stream_query(...)`   | `POST .../reasoningEngines/{id}:streamQuery`                  |
-
-**Is the connection private?**  
-By default, calls go to `aiplatform.googleapis.com` (a public Google API endpoint). However, traffic from Cloud Run → Google APIs travels over Google's internal infrastructure (GFE), not the raw public internet. Fully private routing can be enforced with **VPC Service Controls** or **Private Google Access**.
-
-### A2A vs. Agent Engine API — Two Different Hops
-
-```
-FastAPI frontend
-    ↓  Vertex AI SDK / REST          ← agent_client.py uses THIS
-customers agent (Agent Engine)
-    ↓  A2A / HTTP JSON               ← customers/agent.py uses THIS
-bookings agent (Agent Engine)
-```
-
-- **`agent_client.py`** → Vertex AI Agent Engine API (session + streaming query)
-- **`customers/agent.py`** → A2A protocol via `AuthedRemoteA2aAgent` → bookings agent
