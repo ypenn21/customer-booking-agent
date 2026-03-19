@@ -115,7 +115,6 @@ CUSTOMERS_ENGINE_ID="projects/genai-apps-25/locations/us-central1/reasoningEngin
 gcloud run deploy customer-chatbot \
   --image=$IMAGE \
   --region=$REGION \
-  --allow-unauthenticated \
   --port=8080 \
   --set-env-vars="PROJECT_ID=${PROJECT_ID},LOCATION=${REGION},CUSTOMERS_ENGINE_ID=${CUSTOMERS_ENGINE_ID}" \
   --memory=512Mi --cpu=1
