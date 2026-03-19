@@ -33,7 +33,7 @@ sequenceDiagram
     Note over CustomersAgent: Handles greeting, lookup,<br/>or detects booking intent
 
     alt Needs Booking
-        CustomersAgent->>BookingsAgent: Delegate task (A2A)
+        CustomersAgent->>BookingsAgent: Delegate task (Agent Engine REST API)
         BookingsAgent-->>CustomersAgent: Booking result
     end
 

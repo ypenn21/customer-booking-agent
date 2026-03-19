@@ -3,13 +3,40 @@
 ReAct agent using Vertex AI Agent Engine REST API — customers agent calls bookings agent via Agent Engine REST API
 generated with [`googleCloudPlatform/agent-starter-pack`](https://github.com/GoogleCloudPlatform/agent-starter-pack) version `0.39.3`
 
-
 ## Architecture
 
-![Architecture Diagram](architecture-diagrams/architecture-diagram-customer-bookings.png)
+```mermaid
+sequenceDiagram
+    participant User as User (Browser)
+    participant IAP as Identity-Aware Proxy
+    participant FastAPI as fast-api-fe (Cloud Run)
+    participant CustomersAgent as Customers Agent (Agent Engine)
+    participant BookingsAgent as Bookings Agent (Agent Engine)
+
+    User->>IAP: Access Chat UI / API
+    alt Not Authenticated
+        IAP-->>User: Redirect to Google Login
+        User->>IAP: Authenticate
+    end
+    IAP->>FastAPI: Forward authenticated request
+
+    User->>FastAPI: Chat Message (UI)
+    Note over FastAPI: POST /v1/chat/completions
+    FastAPI->>CustomersAgent: query_agent(message)
+    Note over CustomersAgent: Handles greeting, lookup,<br/>or detects booking intent
+
+    alt Needs Booking
+        CustomersAgent->>BookingsAgent: Delegate task (Agent Engine REST API)
+        BookingsAgent-->>CustomersAgent: Booking result
+    end
+
+    CustomersAgent-->>FastAPI: Final text response
+    FastAPI-->>User: Chat Bubble
+```
+
+<!-- ![Architecture Diagram](architecture-diagrams/architecture-diagram-customer-bookings.png) -->
 
 ## Project Structure
-
 
 ```
 booking/
