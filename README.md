@@ -1,7 +1,7 @@
 # booking
 
-ReAct agent using Vertex AI Agent Engine REST API — customers agent calls bookings agent via A2A [experimental]
-Agent generated with [`googleCloudPlatform/agent-starter-pack`](https://github.com/GoogleCloudPlatform/agent-starter-pack) version `0.39.3`
+ReAct agent using Vertex AI Agent Engine REST API — customers agent calls bookings agent via Agent Engine REST API
+generated with [`googleCloudPlatform/agent-starter-pack`](https://github.com/GoogleCloudPlatform/agent-starter-pack) version `0.39.3`
 
 
 ## Architecture
