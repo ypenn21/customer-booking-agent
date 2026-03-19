@@ -41,8 +41,8 @@ def main():
     environment_variables = {
         "GOOGLE_GENAI_USE_VERTEXAI": "TRUE",
         "GOOGLE_CLOUD_LOCATION": "us-central1",
-        "CUSTOMERS_ENGINE_ID": os.environ.get(
-            "CUSTOMERS_ENGINE_ID",
+        "BOOKINGS_ENGINE_ID": os.environ.get(
+            "BOOKINGS_ENGINE_ID",
             "projects/genai-apps-25/locations/us-central1/reasoningEngines/9102899647310987264",
         ),
         # Enable OpenTelemetry traces and logs for Agent Engine observability.

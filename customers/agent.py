@@ -29,7 +29,7 @@ os.environ["GOOGLE_CLOUD_PROJECT"] = "genai-apps-25"
 os.environ["GOOGLE_CLOUD_LOCATION"] = "global"
 os.environ["GOOGLE_GENAI_USE_VERTEXAI"] = "True"
 ENGINE_ID  = os.environ.get(
-    "CUSTOMERS_ENGINE_ID",
+    "BOOKINGS_ENGINE_ID",
     "projects/genai-apps-25/locations/us-central1/reasoningEngines/9102899647310987264"
 )
 

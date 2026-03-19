@@ -6,6 +6,7 @@ A FastAPI web application that serves:
 - **OpenAI-compatible API** — `POST /v1/chat/completions` that proxies to the `customers` ADK agent via the **Vertex AI Agent Engine REST API**
 
 > **Communication layers:**
+>
 > - `fast-api-fe` → `customers` agent: Vertex AI Agent Engine REST API (session + streaming query)
 > - `customers` agent → `bookings` agent: A2A [experimental]
 
@@ -78,7 +79,7 @@ pip install -r requirements.txt
 # 2. Set environment variables
 export PROJECT_ID=genai-apps-25
 export LOCATION=us-central1
-export CUSTOMERS_ENGINE_ID=projects/803095609412/locations/us-central1/reasoningEngines/376330944350519296
+export CUSTOMERS_ENGINE_ID="projects/genai-apps-25/locations/us-central1/reasoningEngines/4698379211742642176"
 
 # 3. Run the server (from project root)
 uvicorn fast-api-fe.main:app --reload --port 8080
