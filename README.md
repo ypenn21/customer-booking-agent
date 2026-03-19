@@ -122,6 +122,8 @@ uv run adk web --port 8001
 uv run python customers/deploy_agent_engine.py
 ```
 
+5. run the fast-api-fe chat UI — see [fast-api-fe/README.md](fast-api-fe/README.md) for local dev and Cloud Run deployment instructions.
+
 ```
 # a2a snippet for bookings agent.. currently not using a2a
 
