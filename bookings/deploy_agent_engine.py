@@ -47,7 +47,6 @@ def main():
         # OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT also logs the full
         # input prompts and output responses — disable if you want to avoid PII.
         "GOOGLE_CLOUD_AGENT_ENGINE_ENABLE_TELEMETRY": "true",
-        "OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT": "true",
     }
 
     # Check for an existing agent engine with the same display name
