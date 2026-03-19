@@ -122,6 +122,15 @@ See the [observability guide](https://googlecloudplatform.github.io/agent-starte
 This agent supports the [A2A Protocol](https://a2a-protocol.org/). Use `make inspector` to test interoperability.
 See the [A2A Inspector docs](https://github.com/a2aproject/a2a-inspector) for details.
 
+## JWT Claims & User Context
+
+The application extracts all claims from the Identity-Aware Proxy (IAP) JWT token and forwards them to the agents. This provides:
+- **User Identity**: Stable unique IDs (`sub`) and emails.
+- **Access Levels**: Google Cloud Access Context Manager levels.
+- **Custom Attributes**: Roles, tiers, and departments (via GCIP/Firebase).
+
+Detailed information on how these claims are passed and handled can be found in [plans/jwt_claims.md](plans/jwt_claims.md).
+
 ## Add Permission to Agent Engine Default SA
 
 ```bash
