@@ -3,7 +3,11 @@
 A FastAPI web application that serves:
 
 - **Chat UI** — modern dark-mode single-page UI at `GET /`
-- **OpenAI-compatible API** — `POST /v1/chat/completions` that proxies to the `customers` ADK agent on Vertex AI Agent Engine
+- **OpenAI-compatible API** — `POST /v1/chat/completions` that proxies to the `customers` ADK agent via the **Vertex AI Agent Engine REST API**
+
+> **Communication layers:**
+> - `fast-api-fe` → `customers` agent: Vertex AI Agent Engine REST API (session + streaming query)
+> - `customers` agent → `bookings` agent: A2A [experimental]
 
 ## Architecture
 
@@ -28,7 +32,7 @@ sequenceDiagram
     Note over CustomersAgent: Handles greeting, lookup,<br/>or detects booking intent
 
     alt Needs Booking
-        CustomersAgent->>BookingsAgent: Delegate task (A2A via Agent Engine API)
+        CustomersAgent->>BookingsAgent: Delegate task (A2A)
         BookingsAgent-->>CustomersAgent: Booking result
     end
 
