@@ -73,54 +73,11 @@ Before you begin, ensure you have:
 - **Terraform**: For infrastructure deployment - [Install](https://developer.hashicorp.com/terraform/downloads)
 - **make**: Build automation tool - [Install](https://www.gnu.org/software/make/) (pre-installed on most Unix-based systems)
 
-## Quick Start
-
-Install required packages and launch the local development environment:
-
-```bash
-make install && make playground
-```
-
-## Commands
-
-| Command                           | Description                                              |
-| --------------------------------- | -------------------------------------------------------- |
-| `make install`                    | Install dependencies using uv                            |
-| `make playground`                 | Launch local development environment                     |
-| `make lint`                       | Run code quality checks                                  |
-| `make test`                       | Run unit and integration tests                           |
-| `make deploy`                     | Deploy agent to Agent Engine                             |
-| `make register-gemini-enterprise` | Register deployed agent to Gemini Enterprise             |
-| `make inspector`                  | Launch A2A Protocol Inspector                            |
-| `make setup-dev-env`              | Set up development environment resources using Terraform |
-
-For full command options and usage, refer to the [Makefile](Makefile).
-
-## 🛠️ Project Management
-
-| Command                             | What It Does                                                   |
-| ----------------------------------- | -------------------------------------------------------------- |
-| `uvx agent-starter-pack setup-cicd` | One-command setup of entire CI/CD pipeline + infrastructure    |
-| `uvx agent-starter-pack upgrade`    | Auto-upgrade to latest version while preserving customizations |
-| `uvx agent-starter-pack extract`    | Extract minimal, shareable version of your agent               |
-
----
-
 ## Development
 
 Edit your agent logic in `app/agent.py` and test with `make playground` - it auto-reloads on save.
 Use notebooks in `notebooks/` for prototyping and Vertex AI Evaluation.
 See the [development guide](https://googlecloudplatform.github.io/agent-starter-pack/guide/development-guide) for the full workflow.
-
-## Deployment
-
-```bash
-gcloud config set project <your-project-id>
-make deploy
-```
-
-To set up your production infrastructure, run `uvx agent-starter-pack setup-cicd`.
-See the [deployment guide](https://googlecloudplatform.github.io/agent-starter-pack/guide/deployment) for details.
 
 ## Observability
 
@@ -180,6 +137,11 @@ uv run uvicorn fast-api-fe.main:app --reload --port 8080
 
 \*Note make files haven't been fully tested yet. Please use the manual steps above for now.
 
+### 1. Set up CI/CD
+
+To set up your production infrastructure, run `uvx agent-starter-pack setup-cicd`.
+See the [deployment guide](https://googlecloudplatform.github.io/agent-starter-pack/guide/deployment) for details.
+
 ### 1. Set up Infrastructure
 
 Initialize GCP resources (Bucket, IAM, etc.):
@@ -225,6 +187,41 @@ Agent Engine (deployed reasoning engine)
 
 **Is the connection private?**  
 By default, calls go to `aiplatform.googleapis.com` (a public Google API endpoint). However, traffic from Cloud Run → Google APIs travels over Google's internal infrastructure (GFE), not the raw public internet. Fully private routing can be enforced with **VPC Service Controls** or **Private Google Access**.
+
+## Quick Start Using make created by agent-starter-pack
+
+_Note: make files haven't been fully tested yet. Please use the manual steps above for now._
+
+Install required packages and launch the local development environment:
+
+```bash
+make install && make playground
+```
+
+## Commands
+
+| Command                           | Description                                              |
+| --------------------------------- | -------------------------------------------------------- |
+| `make install`                    | Install dependencies using uv                            |
+| `make playground`                 | Launch local development environment                     |
+| `make lint`                       | Run code quality checks                                  |
+| `make test`                       | Run unit and integration tests                           |
+| `make deploy`                     | Deploy agent to Agent Engine                             |
+| `make register-gemini-enterprise` | Register deployed agent to Gemini Enterprise             |
+| `make inspector`                  | Launch A2A Protocol Inspector                            |
+| `make setup-dev-env`              | Set up development environment resources using Terraform |
+
+For full command options and usage, refer to the [Makefile](Makefile).
+
+## 🛠️ Project Management
+
+| Command                             | What It Does                                                   |
+| ----------------------------------- | -------------------------------------------------------------- |
+| `uvx agent-starter-pack setup-cicd` | One-command setup of entire CI/CD pipeline + infrastructure    |
+| `uvx agent-starter-pack upgrade`    | Auto-upgrade to latest version while preserving customizations |
+| `uvx agent-starter-pack extract`    | Extract minimal, shareable version of your agent               |
+
+---
 
 ### A2A vs. Agent Engine API — Two Different Hops
 
