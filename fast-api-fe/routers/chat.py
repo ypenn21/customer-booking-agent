@@ -18,7 +18,7 @@ from ..models.openai_schema import (
     ChatCompletionResponse,
     ChatMessage,
 )
-from ..services.agent_client import query_agent, list_user_sessions
+from ..services.agent_client import query_agent, list_user_sessions, get_session_history
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/v1", tags=["Chat Completions"])
@@ -93,3 +93,18 @@ async def list_sessions(request: Request):
     user_id = _extract_user_id(request)
     sessions = await list_user_sessions(user_id)
     return {"sessions": sessions}
+
+
+@router.get(
+    "/sessions/{session_id}/messages",
+    summary="Get session messages",
+    description="Retrieves the chat history messages for a specific session ID.",
+)
+def get_session_messages(request: Request, session_id: str):
+    user_id = _extract_user_id(request)
+    try:
+        messages = get_session_history(user_id, session_id)
+        return {"messages": messages}
+    except Exception as e:
+        logger.exception(f"Error getting session history: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

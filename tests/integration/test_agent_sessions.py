@@ -53,3 +53,11 @@ def test_session_lifecycle():
         )
         assert resp3.status_code == 200
         assert resp3.json()["session_id"] == session_id
+        
+        # 4. Fetch session history
+        resp4 = client.get(f"/v1/sessions/{session_id}/messages")
+        assert resp4.status_code == 200
+        history = resp4.json().get("messages", [])
+        # We should have at least the messages we just sent
+        assert len(history) > 0
+        assert any(m["role"] == "user" and "Hi" in m["content"] for m in history)

@@ -92,3 +92,28 @@ async def list_user_sessions(user_id: str) -> list[dict]:
     except Exception as e:
         logger.exception("list_user_sessions failed")
         return []
+
+def get_session_history(user_id: str, session_id: str) -> list[dict]:
+    """Retrieves the message history for a given session."""
+    try:
+        client = vertexai.Client(project=PROJECT_ID, location=LOCATION)
+        session_name = f"{ENGINE_ID}/sessions/{session_id}"
+        
+        iterator = client.agent_engines.sessions.events.list(name=session_name)
+        
+        messages = []
+        for event in iterator:
+            if hasattr(event, "content") and event.content.parts:
+                role = getattr(event.content, "role", getattr(event, "author", "unknown"))
+                
+                # Combine all text parts; ignore function call parts (which have no 'text' or empty text)
+                text_parts = [p.text for p in event.content.parts if hasattr(p, "text") and p.text]
+                if text_parts:
+                    messages.append({
+                        "role": role,
+                        "content": "\n".join(text_parts)
+                    })
+        return messages
+    except Exception as e:
+        logger.exception(f"get_session_history failed for session {session_id}")
+        return []

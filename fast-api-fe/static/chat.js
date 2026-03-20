@@ -258,6 +258,38 @@ document.addEventListener("click", (e) => {
 
 // ── Sessions Management ────────────────────────────────────────
 
+async function loadSessionHistory(sessionId) {
+  try {
+    const res = await fetch(`/v1/sessions/${sessionId}/messages`);
+    if (!res.ok) return;
+    const data = await res.json();
+    
+    // Clear feed
+    messages = [];
+    [...feed.children].forEach(child => {
+      if (child.id !== "welcome-screen") child.remove();
+    });
+    
+    if (data.messages && data.messages.length > 0) {
+      if (welcome) welcome.style.display = "none";
+      
+      // Events from the backend are chronological
+      const history = data.messages;
+      
+      history.forEach(msg => {
+        const mappedRole = msg.role === "user" ? "user" : "assistant";
+        messages.push({ role: mappedRole, content: msg.content });
+        appendBubble(mappedRole, msg.content);
+      });
+    } else {
+      if (welcome) welcome.style.display = "none";
+      appendBubble("assistant", "Session context resumed. No messages found.");
+    }
+  } catch (err) {
+    console.error("Failed to load session history:", err);
+  }
+}
+
 async function refreshSessionList() {
   try {
     const res = await fetch("/v1/sessions");
@@ -284,15 +316,7 @@ async function refreshSessionList() {
         btn.onclick = () => {
           currentSessionId = session.id;
           localStorage.setItem("currentSessionId", currentSessionId);
-          messages = [];
-          
-          // Clear feed
-          [...feed.children].forEach(child => {
-            if (child.id !== "welcome-screen") child.remove();
-          });
-          if (welcome) welcome.style.display = "none";
-          
-          appendBubble("assistant", "Session context resumed.");
+          loadSessionHistory(currentSessionId);
           refreshSessionList();
           
           if (window.innerWidth <= 700) {
@@ -311,3 +335,6 @@ async function refreshSessionList() {
 
 // Initial fetch on load
 refreshSessionList();
+if (currentSessionId) {
+  loadSessionHistory(currentSessionId);
+}
