@@ -3,6 +3,39 @@
 ## Overview
 Implement long-term, cross-session memory for the Customer Booking Agent using **Vertex AI Agent Engine Memory Bank**. This allows the agent to automatically learn from user conversations (e.g., preferred travel destinations, seating preferences) and access those memories in future sessions, providing a highly personalized experience.
 
+## User Flow
+
+**Memory Generation (After Session)**: When a user clicks "New Chat", their current conversation officially ends. The backend instantly creates a fresh session for the user to chat in, but dispatches the finished session (`old_session_id`) to an asynchronous background task. This background task reads the finished conversation and **permanently stores** any useful extracted facts into the user's Memory Bank. Doing this in the background ensures the chat interface remains lag-free.
+
+**Memory Retrieval (During Session):** While chatting, the Agent can proactively call the `retrieve_my_preferences` tool to fetch long-term context about the user from the Memory Bank, allowing it to personalize responses on the fly.
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant UI as Frontend
+    participant API as FastAPI Backend
+    participant Agent as Vertex AI Agent
+    participant MB as Vertex AI Memory Bank
+
+    User->>UI: Clicks "New Chat" & Sends Message
+    UI->>API: POST /chat/completions (force_new_session=True)
+    
+    note over API, MB: Asynchronous Memory Generation
+    API-xMB: generate_memories(old_session_id) [Stores Facts Permanently]
+    
+    API->>Agent: Initialize New Session & Route Message
+    
+    rect rgb(240, 248, 255)
+        note over Agent, MB: During the new conversation
+        Agent->>MB: [Tool Call] retrieve_my_preferences(user_id)
+        MB-->>Agent: Returns stored facts & preferences
+        Agent-->>API: Personalized response using memory
+    end
+    
+    API-->>UI: Return Agent Response
+    UI-->>User: Display Response
+```
+
 ## Documentation References
 
 ### Google Developer Knowledge
