@@ -18,7 +18,7 @@ from ..models.openai_schema import (
     ChatCompletionResponse,
     ChatMessage,
 )
-from ..services.agent_client import query_agent, reset_session
+from ..services.agent_client import query_agent, list_user_sessions
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/v1", tags=["Chat Completions"])
@@ -63,13 +63,19 @@ async def chat_completions(req: ChatCompletionRequest, request: Request) -> Chat
     # 3. Query the agent, reusing or creating a session as requested
     force_new = getattr(req, "force_new_session", False)
     try:
-        agent_reply = await query_agent(user_input, user_id=user_id, force_new=force_new)
+        agent_reply, session_id = await query_agent(
+            user_input, 
+            user_id=user_id, 
+            session_id=req.session_id, 
+            force_new=force_new
+        )
     except Exception as exc:
         logger.exception("query_agent failed for input=%r", user_input[:80])
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
     return ChatCompletionResponse(
         model=req.model,
+        session_id=session_id,
         choices=[
             ChatChoice(
                 message=ChatMessage(role="assistant", content=agent_reply),
@@ -78,12 +84,12 @@ async def chat_completions(req: ChatCompletionRequest, request: Request) -> Chat
     )
 
 
-@router.post(
-    "/sessions/new",
-    summary="Start a new chat session",
-    description="Discards the current Agent Engine session so the next message starts a fresh one.",
+@router.get(
+    "/sessions",
+    summary="List user sessions",
+    description="List all Agent Engine sessions started by the authenticated user.",
 )
-async def new_session(request: Request):
+async def list_sessions(request: Request):
     user_id = _extract_user_id(request)
-    await reset_session(user_id)
-    return {"status": "ok", "message": "Session reset. Next message will start a new session."}
+    sessions = await list_user_sessions(user_id)
+    return {"sessions": sessions}

@@ -25,7 +25,7 @@ class ChatCompletionRequest(BaseModel):
     temperature: Optional[float] = None
     max_tokens: Optional[int] = None
     force_new_session: bool = False  # If True, discard existing session and start fresh
-
+    session_id: Optional[str] = None
 
 class ChatChoice(BaseModel):
     """A single chat completion choice."""
@@ -50,5 +50,6 @@ class ChatCompletionResponse(BaseModel):
     object: str = "chat.completion"
     created: int = Field(default_factory=lambda: int(time.time()))
     model: str = "customers-agent"
+    session_id: Optional[str] = None
     choices: list[ChatChoice]
     usage: UsageStats = Field(default_factory=UsageStats)

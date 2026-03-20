@@ -14,6 +14,9 @@
 /** @type {{ role: "system"|"user"|"assistant", content: string }[]} */
 let messages = [];
 
+/** The active session ID fetched from localStorage or API response. */
+let currentSessionId = localStorage.getItem("currentSessionId") || null;
+
 /**
  * True only for the very first message after "New Chat" was clicked.
  * Signals the backend to create a brand-new Agent Engine session.
@@ -112,14 +115,20 @@ function removeTyping() {
  * @returns {Promise<string>} the assistant's reply content
  */
 async function fetchCompletion(newSession = false) {
+  const body = {
+    model: "customers-agent",
+    messages,
+    force_new_session: newSession,
+  };
+  
+  if (currentSessionId && !newSession) {
+    body.session_id = currentSessionId;
+  }
+
   const response = await fetch("/v1/chat/completions", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: "customers-agent",
-      messages,
-      force_new_session: newSession,
-    }),
+    body: JSON.stringify(body),
   });
 
   if (!response.ok) {
@@ -132,6 +141,13 @@ async function fetchCompletion(newSession = false) {
   }
 
   const data = await response.json();
+  
+  if (data.session_id) {
+    currentSessionId = data.session_id;
+    localStorage.setItem("currentSessionId", currentSessionId);
+    refreshSessionList();
+  }
+
   return data.choices?.[0]?.message?.content ?? "No response from agent.";
 }
 
@@ -174,15 +190,11 @@ async function sendMessage(text) {
 // ── Reset ──────────────────────────────────────────────────────────────────────
 
 async function startNewChat() {
-  // Tell the backend to discard the current Agent Engine session
-  try {
-    await fetch("/v1/sessions/new", { method: "POST" });
-  } catch (err) {
-    console.warn("Could not reset backend session:", err);
-  }
-
-  // Mark that the next message should start a fresh session (belt-and-suspenders)
+  // Mark that the next message should start a fresh session
   forceNewSession = true;
+  currentSessionId = null;
+  localStorage.removeItem("currentSessionId");
+  refreshSessionList();
 
   messages = [];
   // Clear message rows but keep the welcome screen element
@@ -243,3 +255,59 @@ document.addEventListener("click", (e) => {
     sidebar.classList.remove("open");
   }
 });
+
+// ── Sessions Management ────────────────────────────────────────
+
+async function refreshSessionList() {
+  try {
+    const res = await fetch("/v1/sessions");
+    if (!res.ok) return;
+    const data = await res.json();
+    
+    const container = document.getElementById("session-history-container");
+    const list = document.getElementById("session-list");
+    if (!container || !list) return;
+
+    if (data.sessions && data.sessions.length > 0) {
+      container.style.display = "flex";
+      list.innerHTML = "";
+      
+      data.sessions.forEach(session => {
+        const btn = document.createElement("button");
+        btn.className = "session-chip";
+        btn.textContent = `Session: ${session.id.substring(0, 8)}...`;
+        
+        if (session.id === currentSessionId) {
+          btn.classList.add("active");
+        }
+        
+        btn.onclick = () => {
+          currentSessionId = session.id;
+          localStorage.setItem("currentSessionId", currentSessionId);
+          messages = [];
+          
+          // Clear feed
+          [...feed.children].forEach(child => {
+            if (child.id !== "welcome-screen") child.remove();
+          });
+          if (welcome) welcome.style.display = "none";
+          
+          appendBubble("assistant", "Session context resumed.");
+          refreshSessionList();
+          
+          if (window.innerWidth <= 700) {
+            sidebar.classList.remove("open");
+          }
+        };
+        list.appendChild(btn);
+      });
+    } else {
+      container.style.display = "none";
+    }
+  } catch(e) { 
+    console.warn("Failed to list sessions:", e); 
+  }
+}
+
+// Initial fetch on load
+refreshSessionList();

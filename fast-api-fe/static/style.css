@@ -158,6 +158,55 @@ body {
   color: var(--text-primary);
 }
 
+.session-history-nav {
+  margin-top: -10px;
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+}
+
+.session-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.session-chip {
+  text-align: left;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13.5px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: flex;
+  align-items: center;
+}
+
+.session-chip::before {
+  content: '💭';
+  margin-right: 8px;
+  font-size: 13px;
+  opacity: 0.7;
+}
+
+.session-chip:hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+.session-chip.active {
+  background: var(--accent-dim);
+  color: var(--accent);
+  font-weight: 500;
+}
+
+
 /* ── Main area ───────────────────────────────────────────── */
 
 .main {
