@@ -44,6 +44,28 @@ def request_user_input(message: str) -> dict:
     """
     return {"status": "pending", "message": message}
 
+# ── Booking Session Design Decision ──────────────────────────────────────
+# A new session is created for every booking tool call (one-shot pattern).
+#
+# Why NOT reuse the same session across calls:
+#   - The customer agent is the state aggregator; the booking agent is a
+#     stateless executor that receives all required data in a single request.
+#   - Context isolation: independent booking requests won't bleed into each
+#     other (e.g. hotel booking context polluting a later flight booking).
+#   - Automatic recovery: if a session errors out, the next call starts fresh.
+#
+# Why NOT use the customer's session_id for the booking session:
+#   - The Agent Engine API (async_create_session) does NOT accept a custom
+#     session_id when called remotely. The underlying AdkApp layer supports it,
+#     but the default Vertex AI session service backing Agent Engine always
+#     generates its own ID.
+#
+# If session reuse is ever needed (e.g. multi-turn booking workflows):
+#   1. Store the server-generated session ID in tool_context.state
+#      (tool_context.state["booking_session_id"]) after the first call.
+#   2. On subsequent calls, check for the stored ID and skip creation.
+#   3. Or use remote_app.list_sessions(user_id=...) to find an existing session.
+# ─────────────────────────────────────────────────────────────────────────
 async def bookings(request: str, tool_context: ToolContext) -> str:
     """Delegates a booking request to the bookings agent.
     
