@@ -34,6 +34,19 @@ logger.info("vertexai initialised: project=%s location=%s engine=%s", PROJECT_ID
 
 from typing import Optional
 
+# ── Session Architecture Note ──────────────────────────────────────────
+# 1. Custom Session IDs: The Agent Engine API (async_create_session)
+#    does NOT accept a custom session_id when called remotely.
+#    It will always return a server-generated numeric ID.
+#
+# 2. Session Reuse: Since IDs are server-assigned, persistence
+#    works by storing the returned ID and passing it back to subsequent
+#    async_stream_query calls.
+#
+# 3. Delegated Tool Calls (Bookings): The same logic applies within
+#    agent tool calls. We use a "one-shot" pattern for the bookings
+#    agent to avoid session complex mapping (customer_id -> booking_id).
+# ───────────────────────────────────────────────────────────────────────
 async def query_agent(
     user_message: str,
     user_id: str = "web_user",
