@@ -25,7 +25,6 @@ from google.genai import types
 import os
 from vertexai import agent_engines
 
-os.environ["GOOGLE_CLOUD_PROJECT"] = "genai-apps-25"
 os.environ["GOOGLE_CLOUD_LOCATION"] = "global"
 os.environ["GOOGLE_GENAI_USE_VERTEXAI"] = "True"
 ENGINE_ID  = os.environ.get(
