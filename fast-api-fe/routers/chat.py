@@ -31,6 +31,8 @@ def _extract_user_id(request: Request) -> str:
     if iap_jwt:
         try:
             decoded = jwt.decode(iap_jwt, options={"verify_signature": False})
+            logger.info("Decoded IAP JWT: %s", decoded)
+            print("Decoded IAP JWT: %s", decoded)
             user_id = decoded.get("email", user_id)
             logger.info("Authenticated user from IAP: %s", user_id)
         except Exception as e:

@@ -122,7 +122,7 @@ gcloud run deploy customer-chatbot \
   --region=$REGION \
   --port=8080 \
   --set-env-vars="PROJECT_ID=${PROJECT_ID},LOCATION=${REGION},CUSTOMERS_ENGINE_ID=${CUSTOMERS_ENGINE_ID}" \
-  --memory=512Mi --cpu=1
+  --memory=512Mi --cpu=2
 ```
 
 > **Note on IAP**: For production, remove `--allow-unauthenticated` and attach a Global HTTPS Load Balancer with IAP enabled. See `plans/fast-api-fe.md` for full setup steps.
