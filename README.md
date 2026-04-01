@@ -40,6 +40,9 @@ sequenceDiagram
 
 ```text
 customer-booking-agent/
+├── .github/                # GitHub Actions & AI Automation
+│   ├── workflows/          # CI/CD pipelines (Review, Triage, Invoke)
+│   └── commands/           # Gemini CLI prompt definitions (TOML)
 ├── bookings/               # Bookings Agent (ADK/A2A app)
 │   ├── agent.py            # Agent definition & ADK/A2A/FastAPI app
 │   ├── agent_executor.py   # A2A adapter (Reasoning Engine wrapper)
@@ -63,6 +66,27 @@ customer-booking-agent/
 ```
 
 > 💡 **Tip:** Use [Gemini CLI](https://github.com/google-gemini/gemini-cli) for AI-assisted development - project context is pre-configured in `GEMINI.md`.
+
+## GitHub Actions & AI Automation
+
+This project includes a suite of Gemini-powered GitHub Actions for automated repository management and code quality:
+
+| Workflow | Trigger | Description |
+|----------|---------|-------------|
+| **Gemini Dispatch** | PR Comments, Issues, Reviews | Orchestrates all Gemini commands (e.g., `@gemini-cli /review`). |
+| **Gemini Review** | PR Opened/Updated | Performs automated, high-signal code reviews using the `/pr-code-review` prompt. |
+| **Gemini Triage** | New Issues | Automatically labels new issues based on content. |
+| **Gemini Scheduled Triage** | Hourly | Batch triages existing issues to maintain backlog health. |
+| **Gemini Plan Execution** | `@gemini-cli /approve` | Safely executes approved implementation plans using a staff-engineer persona. |
+
+### AI Prompts & Personas
+
+Custom AI personas and operational constraints are defined in `.github/commands/`:
+- **Code Reviewer**: Specialized in correctness, security, and performance.
+- **Triage Engineer**: Precise issue classification and labeling.
+- **Autonomous Engineer**: Systematic plan formulation and execution.
+
+> 📚 **Reference:** These workflows are based on the [official Gemini CLI PR Review examples](https://github.com/google-github-actions/run-gemini-cli/tree/main/examples/workflows/pr-review).
 
 ## Requirements
 
