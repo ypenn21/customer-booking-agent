@@ -64,6 +64,32 @@ customer-booking-agent/
 
 > 💡 **Tip:** Use [Gemini CLI](https://github.com/google-gemini/gemini-cli) for AI-assisted development - project context is pre-configured in `GEMINI.md`.
 
+## GitHub Actions & AI Automation
+
+This project includes a suite of Gemini-powered GitHub Actions for automated repository management and code quality:
+
+| Workflow | Trigger | Description |
+|----------|---------|-------------|
+| **Gemini Dispatch** | PR Comments, Issues, Reviews | Orchestrates all Gemini commands (e.g., `@gemini-cli /review`). |
+| **Gemini Review** | PR Opened/Updated | Performs automated, high-signal code reviews using the `/pr-code-review` prompt. |
+| **Gemini Triage** | New Issues | Automatically labels new issues based on content. |
+| **Gemini Scheduled Triage** | Hourly | Batch triages existing issues to maintain backlog health. |
+| **Gemini Plan Execution** | `@gemini-cli /approve` | Safely executes approved implementation plans using a staff-engineer persona. |
+
+
+Use setup command (Recommended)
+
+Start the Gemini CLI in your terminal:
+```bash
+gemini
+```
+In Gemini CLI in your terminal, type:
+```
+/setup-github
+```
+
+> 💡 **Ref:** Details [Run Gemini CLI](https://github.com/google-github-actions/run-gemini-cli)
+
 ## Requirements
 
 Before you begin, ensure you have:
