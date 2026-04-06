@@ -13,7 +13,7 @@ DISPLAY_NAME = "Customer Assistant"
 
 REQUIREMENTS = [
     "google-cloud-aiplatform[evaluation,agent-engines]>=1.130.0",
-    "google-adk>=1.16.0,<2.0.0",
+    "google-adk>=1.27.4,<2.0.0",
     "a2a-sdk~=0.3.22",
     "nest-asyncio>=1.6.0,<2.0.0",
     "opentelemetry-instrumentation-google-genai>=0.1.0,<1.0.0",
