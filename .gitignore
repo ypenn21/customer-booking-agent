@@ -200,4 +200,20 @@ my_env.tfvars
 
 # A2A Inspector
 tools/a2a-inspector/
-gha-creds-*.json
+
+# terraform auto-generated
+deployment
+
+# env specific configuration
+config.sh
+
+# env specific configuartion
+gcip-config.sh
+
+# The base configuration lives in .cloudbuild/build-fast-api-fe.yaml.tpl and this file is generated
+.cloudbuild/build-fast-api-fe.yaml
+
+# The requirements.txt in fast-api-fe should be generated at build time by the "build.sh" and "build-on-cloud-build.sh" scripts
+fast-api-fe/requirements.txt
+
+
