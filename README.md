@@ -1,408 +1,240 @@
-# customer-booking-agent
+# Agent Security Patterns: Multi-Agent Customer Booking Assistant
 
-ReAct agent using Vertex AI Agent Engine REST API — customers agent calls bookings agent via Agent Engine REST API
-generated with [`googleCloudPlatform/agent-starter-pack`](https://github.com/GoogleCloudPlatform/agent-starter-pack) version `0.39.3`
+A reference implementation for a secure, multi-agent system on Google Cloud. This project demonstrates how to orchestrate specialized agents while maintaining a hardened security perimeter using **Identity-Aware Proxy (IAP)**, **Identity Platform (GCIP)**, **Cloud Armor (WAF)**, and a **"Before Sign-in" blocking function** for secure Microsoft token vaulting.
 
-## Architecture
+## 🛡️ Security Architecture
+
+This repository implements the following **Agent Security Patterns**:
+
+- **Perimeter Security:** Cloud Armor protects against WAF threats (SQLi, XSS), while IAP ensures only authenticated users can reach the frontend.
+- **Identity Orchestration:** Google Cloud Identity Platform (GCIP) manages multi-tenant authentication, specifically configured here for Microsoft Entra ID.
+- **Token Vaulting:** A "Before Sign-in" blocking function intercepts Microsoft OAuth tokens (Access & Refresh) during login and securely vaults them in **Secret Manager**, allowing the agents to act on behalf of the user (e.g., managing Outlook Calendars).
+- **Multi-Agent Delegation:** A "Customers" orchestrator agent manages user identity and delegates specialized tasks to a "Bookings" agent via the Vertex AI Agent Engine REST API.
+
+### Architecture Diagram
 
 ```mermaid
 sequenceDiagram
     participant User as User (Browser)
-    participant IAP as Identity-Aware Proxy
-    participant FastAPI as fast-api-fe (Cloud Run)
-    participant CustomersAgent as Customers Agent (Agent Engine)
-    participant BookingsAgent as Bookings Agent (Agent Engine)
+    participant Armor as Cloud Armor (WAF)
+    participant IAP as Identity-Aware Proxy / GCIP
+    participant Blocking as Before Sign-in Handler (Cloud Function)
+    participant Secret as Secret Manager
+    participant FastAPI as Chat Frontend (Cloud Run)
+    participant Customers as Customers Agent (Orchestrator)
+    participant Bookings as Bookings Agent (Specialized)
+    participant Graph as Microsoft Graph API
 
-    User->>IAP: Access Chat UI / API
+    User->>Armor: Access Chat UI
+    Armor->>IAP: Forward (if safe)
     alt Not Authenticated
-        IAP-->>User: Redirect to Google Login
+        IAP-->>User: Redirect to Microsoft Login
         User->>IAP: Authenticate
+        IAP->>Blocking: Trigger beforeSignIn
+        Note over Blocking: Intercept & vault tokens
+        Blocking->>Secret: Store MS Tokens (uid-keyed)
+        Blocking-->>IAP: Success
     end
-    IAP->>FastAPI: Forward authenticated request
+    IAP->>FastAPI: Forward authenticated request with JWT
 
-    User->>FastAPI: Chat Message (UI)
-    Note over FastAPI: POST /v1/chat/completions
-    FastAPI->>CustomersAgent: query_agent(message)
-    Note over CustomersAgent: Handles greeting, lookup,<br/>or detects booking intent
-
+    FastAPI->>Customers: query_agent(message + user_identity)
     alt Needs Booking
-        CustomersAgent->>BookingsAgent: Delegate task (Agent Engine REST API)
-        BookingsAgent-->>CustomersAgent: Booking result
+        Customers->>Bookings: Delegate task
+        Bookings->>Secret: Fetch User MS Token
+        Bookings->>Graph: Create Calendar Event
+        Bookings-->>Customers: Success
     end
 
-    CustomersAgent-->>FastAPI: Final text response
+    Customers-->>FastAPI: Final response
     FastAPI-->>User: Chat Bubble
 ```
-<!-- ![Architecture Diagram](architecture-diagrams/architecture-diagram-customer-bookings.png) -->
 
-```mermaid
-graph TD
-    %% Authentication Phase
-    User((User)) -->|1. Login Request| WebApp[FastAPI Web Frontend]
-    WebApp -->|2. Redirect| IAP[Identity-Aware Proxy / GCIP]
-    IAP -->|3. Microsoft Auth| MS[Microsoft Identity Provider]
-    MS -->|4. Auth Success + Tokens| IAP
-    
-    subgraph BlockingFunction [Identity Platform Trigger]
-        IAP -->|5. Trigger| BSI[before-sign-in Handler]
-        BSI -->|6. Save Tokens| SM[(Secret Manager)]
-        BSI -->|7. Set emailVerified: true| IAP
-    end
-    
-    IAP -->|8. Grant Access + IAP JWT| WebApp
-    
-    %% Chat Phase
-    User -->|9. Chat Message + IAP JWT| WebApp
-    WebApp -->|10. Extract User Identity| WebApp
-    WebApp -->|11. Proxy Request| CA[Customers Orchestrator Agent]
-    CA -->|12. Detect Booking Intent| CA
-    
-    subgraph AgentAction [Agent Tool Execution]
-        CA -->|13. Call Tool| BA[Bookings Agent]
-        BA -->|14. Extract sub from JWT| BA
-        BA -->|15. Retrieve Tokens| SM
-        BA -->|16. Action with Tokens| MSApi[Microsoft API / Mock]
-    end
-    
-    BA -->|17. Success Response| CA
-    CA -->|18. Final Agent Reply| WebApp
-    WebApp -->|19. Show Response| User
-```
+## 🚀 Setup Instructions
 
-## Project Structure
+### 1. Prerequisites
+- **Argolis Account** (for DNS and internal testing).
+- **Google Cloud SDK (gcloud)**.
+- **uv** Python package manager.
+- **Microsoft Azure/Entra Account** (with permission to register apps).
 
-```text
-customer-booking-agent/
-├── bookings/               # Bookings Agent (ADK/A2A app)
-│   ├── agent.py            # Agent definition & ADK/A2A/FastAPI app
-│   ├── agent_executor.py   # A2A adapter (Reasoning Engine wrapper)
-│   └── deploy_agent_engine.py # deploy bookings agent to agent engine
-├── customers/              # Customer Agent (Orchestrator)
-│   ├── agent.py            # Main orchestrator logic
-│   ├── app.py              # AdkApp wrapper
-│   └── deploy_agent_engine.py # deploy customers agent to agent engine
-├── fast-api-fe/            # Web Chat Interface (FastAPI)
-│   ├── main.py             # App entry point
-│   ├── routers/            # OpenAI-compatible API routes
-│   └── services/           # Client for Agent Engine
-├── deployment/             # Infrastructure & Deploy Utils
-│   ├── agent_engine/       # Shared deployment scripts
-│   └── terraform/          # GCP resource provisioning
-├── architecture-diagrams/  # Architecture diagrams and assets
-├── plans/                  # Implementation plans and documentation
-├── tests/                  # Unit and integration tests
-├── Makefile                # Project-wide development commands
-└── pyproject.toml          # Root dependencies
-```
+### 2. Initial Project Setup
+1. Create a new Google Cloud project (recommended).
+2. Clone the repository.
+3. Copy `config.example.sh` to `config.sh`.
+4. Run the initial setup scripts:
+   ```bash
+   cd setup-scripts
+   ./enable-apis.sh
+   ./grant-all.sh
+   ./setup-ar-repo.sh
+   ./grant-cloud-build-roles.sh
+   cd ..
+   ```
 
-> 💡 **Tip:** Use [Gemini CLI](https://github.com/google-gemini/gemini-cli) for AI-assisted development - project context is pre-configured in `GEMINI.md`.
+### 3. Frontend Deployment
+1. Build the frontend image:
+   ```bash
+   cd fast-api-fe
+   ./build-on-cloud-build.sh
+   ```
+2. Deploy the frontend service:
+   ```bash
+   ./deploy.sh
+   cd ..
+   ```
 
-## GitHub Actions & AI Automation
+### 4. Argolis DNS Setup
+1. Follow **go/argolis-dns** to create a DNS zone.
+2. Generate an external IP:
+   ```bash
+   cd ingress/setup-scripts
+   ./setup-external-ip-addr.sh
+   ```
+3. Create a **DNS A record** (e.g., `bookings.[DNS_ZONE]`) pointing to the generated IP.
 
-This project includes a suite of Gemini-powered GitHub Actions for automated repository management and code quality:
+### 5. Microsoft App Registration
+1. Sign in to [Microsoft Entra](https://entra.microsoft.com/).
+2. Click **App Registrations** in the left menu > **New Registration**.
+3. Name: `agentic-booking-application`.
+4. Supported account types: **Any Entra ID Tenant + Personal Microsoft Accounts**.
+5. Click **Register**. Copy your **Application (Client) ID**.
+6. Navigate to **Certificates & secrets** > **New client secret**. Copy the **Value** (not Secret ID).
+7. Navigate to **Authentication** > **Add a platform** > **Web**:
+   - Redirect URI: `https://{PROJECT_ID}.firebaseapp.com/__/auth/handler`
+   - Check **ID tokens** and **Access tokens**.
+8. Navigate to **API permissions** > **Add a permission** > **Microsoft Graph**:
+   - **Application permissions**: Add `Calendars.ReadWrite`.
+   - **Delegated permissions**: Add `email`, `offline_access`, `profile`, `openid`.
 
-| Workflow | Trigger | Description |
-|----------|---------|-------------|
-| **Gemini Dispatch** | PR Comments, Issues, Reviews | Orchestrates all Gemini commands (e.g., `@gemini-cli /review`). |
-| **Gemini Review** | PR Opened/Updated | Performs automated, high-signal code reviews using the `/pr-code-review` prompt. |
-| **Gemini Triage** | New Issues | Automatically labels new issues based on content. |
-| **Gemini Scheduled Triage** | Hourly | Batch triages existing issues to maintain backlog health. |
-| **Gemini Plan Execution** | `@gemini-cli /approve` | Safely executes approved implementation plans using a staff-engineer persona. |
+### 6. Identity Platform (GCIP) Configuration
+1. Navigate to **Identity Platform** in the Cloud Console.
+2. **Enable Tenants:** Go to **Settings** (gear icon) > **Security** tab > Click **Allow Tenants**.
+3. **Add Tenant:** Click **Add a Tenant**, name it `ms-agent-tenant`.
+4. **Configure Provider:**
+   - Select `ms-agent-tenant` from the **Scope to a Tenant** selector.
+   - Click the **Providers** icon (shapes) > **Add a Provider**.
+   - Select **Microsoft** and fill in your Client ID and Secret from Entra.
+   - *Note: Ignore the recommended Callback URL in this form.*
+5. **Configure Domain & Triggers:**
+   - Switch **Scope to a Tenant** back to **None (Project)**.
+   - **Security Tab:** Add your custom domain (e.g., `bookings.[LDAP].demo.altostrat.com`).
+   - **Triggers Tab:** Scroll to **Additional Provider Token Credentials** and check **ID, Access, and Refresh**. Click **Save**.
+6. Update `gcip-config.sh` with your `DOMAIN`, `API_KEY`, and `TENANT_ID`.
 
+### 7. Ingress & IAP Configuration
+1. Run the ingress setup:
+   ```bash
+   cd ingress/setup-scripts
+   ./setup-all.sh
+   cd ../..
+   ```
+2. **Branding:** Navigate to the **Branding** page (Google Auth Platform). Set name to `iap-client`, support email and contact info to `admin@{LDAP}.altostrat.com`, and set audience to **External**.
+3. **Create IAP OAuth Credentials:**
+   - Go to **APIs & Services > Credentials** > **Create Credentials > OAuth client ID**.
+   - Type: **Web application**. Name: `IAP-frontend-ui-backend`.
+   - Click **Create**. Download the JSON or copy the **Client ID** and **Client Secret**.
+   - Click the **Pencil icon** (Edit) for this client and add an **Authorized redirect URI**: 
+     `https://iap.googleapis.com/v1/oauth/clientIds/{YOUR_FULL_CLIENT_ID}:handleRedirect`
+4. **Enable IAP on Backend:**
+   - Navigate to the **IAP** page in the Cloud Console.
+   - Click the toggle next to `frontend-ui-backend` (under Backend Services).
+   - Click **Turn On** (confirming you've read the docs).
+   - Click **Actions > Settings** for that backend.
+   - Select the **Custom OAuth** radio button. Enter the Client ID and Secret you created.
+   - Click **Save**.
+5. **Update Config:** Click **Actions > Get JWT Audience Code**. Copy this value into `config.sh` as `IAP_EXPECTED_AUDIENCE`.
 
-Use setup command (Recommended)
+#### 🔍 Intermediate Validation: IAP Endpoint
+1. Visit your custom domain (e.g., `bookings.[LDAP].demo.altostrat.com`).
+2. **Troubleshooting `Forbidden` Error:**
+   - If you see `Error: Forbidden - Your client does not have permission to get URL /auth/handler.html...`:
+   - Copy the `REDIRECT_URI` shown in the error.
+   - Add it as an **Authorized redirect URI** in your OAuth Client (on the **Credentials** page).
+   - Navigate to the **Cloud Run** service for the frontend, click the **Security** tab, and ensure **Allow Public Access** is selected.
+3. **Success Criterion:** You should see the chat interface. If you type a message and see *"Error: Server misconfiguration: Missing IAP audience string"*, your IAP config is working correctly.
 
-Start the Gemini CLI in your terminal:
+### 8. Blocking Function (Token Vault)
+1. Deploy the "Before Sign-in" handler:
+   ```bash
+   cd ingress/before-sign-in-handler
+   ./deploy.sh
+   ./attach-function-to-iap.sh
+   cd ../..
+   ```
+
+#### 🔍 Intermediate Validation: Token Vaulting
+1. **Trigger Re-authentication:** Use your browser to visit your application. If you are already signed in, you must delete the session cookies for your domain to trigger the blocking function:
+   - Open browser **Developer Tools** (F12) > **Application** tab > **Cookies** (in the left menu).
+   - Select your domain and click **Clear All** (circle with a line through it).
+   - *Note: You do not need to sign out of your Microsoft account itself.*
+2. **Sign In:** Authenticate again via Microsoft.
+3. **Verify Vaulting:** Visit **Secret Manager** in the Google Cloud Console.
+4. **Success Criterion:** You should see a new secret prepended with `ms-tokens-` (e.g., `ms-tokens-[USER_UID]`). This confirms the blocking function is correctly intercepting and vaulting the Access and Refresh tokens.
+
+### 9. Agent Engine Deployment
+1. Deploy **Bookings Agent**:
+   ```bash
+   source config.sh
+   uv run python bookings/deploy_agent_engine.py
+   ```
+   Update `BOOKINGS_ENGINE_ID` and `BOOKINGS_PRINCIPAL` in `config.sh`.
+2. Deploy **Customers Agent**:
+   ```bash
+   source config.sh
+   uv run python customers/deploy_agent_engine.py
+   ```
+   Update `CUSTOMERS_ENGINE_ID` and `CUSTOMERS_PRINCIPAL` in `config.sh`.
+3. Run final permission grants:
+   ```bash
+   cd setup-scripts
+   ./after-agents-deployment-grant.sh
+   ./after-customers-agent-deployment-grant.sh
+   cd ..
+   ```
+
+### 10. Final Redeploy
+Redeploy the frontend to pick up all final environment variables:
 ```bash
-gemini
-```
-In Gemini CLI in your terminal, type:
-```
-/setup-github
+cd fast-api-fe
+./deploy.sh
 ```
 
-> 💡 **Ref:** Details [Run Gemini CLI](https://github.com/google-github-actions/run-gemini-cli)
+## 🧪 Final Validation
+1. Visit your custom domain.
+2. Prompt the agent: *"Make an appointment for a 45 minute haircut for Bob on April 24, 2026"*.
+3. **Success Criterion:** Verify a "Success" message in chat and check your [Outlook Calendar](https://outlook.live.com/calendar/) for the new event.
 
-## Requirements
+## 💻 Local Development
 
-Before you begin, ensure you have:
+While the full security pattern requires a deployed environment, you can test agent logic locally:
 
-- **uv**: Python package manager (used for all dependency management in this project) - [Install](https://docs.astral.sh/uv/getting-started/installation/) ([add packages](https://docs.astral.sh/uv/concepts/dependencies/) with `uv add <package>`)
-- **Google Cloud SDK**: For GCP services - [Install](https://cloud.google.com/sdk/docs/install)
-- **Terraform**: For infrastructure deployment - [Install](https://developer.hashicorp.com/terraform/downloads)
-- **make**: Build automation tool - [Install](https://www.gnu.org/software/make/) (pre-installed on most Unix-based systems)
-
-## Development
-
-Edit your agent logic in `app/agent.py` and test with `make playground` - it auto-reloads on save.
-Use notebooks in `notebooks/` for prototyping and Vertex AI Evaluation.
-See the [development guide](https://googlecloudplatform.github.io/agent-starter-pack/guide/development-guide) for the full workflow.
-
-## Observability
-
-Built-in telemetry exports to Cloud Trace, BigQuery, and Cloud Logging.
-See the [observability guide](https://googlecloudplatform.github.io/agent-starter-pack/guide/observability) for queries and dashboards.
-
-## A2A Inspector
-
-This agent supports the [A2A Protocol](https://a2a-protocol.org/). Use `make inspector` to test interoperability.
-See the [A2A Inspector docs](https://github.com/a2aproject/a2a-inspector) for details.
-
-## JWT Claims & User Context
-
-The application extracts all claims from the Identity-Aware Proxy (IAP) JWT token and forwards them to the agents. This provides:
-
-- **User Identity**: Stable unique IDs (`sub`) and emails.
-- **Access Levels**: Google Cloud Access Context Manager levels.
-- **Custom Attributes**: Roles, tiers, and departments (via GCIP/Firebase).
-
-Detailed information on how these claims are passed and handled can be found in [plans/jwt_claims.md](plans/jwt_claims.md).
-
-## Add Permission to Agent Engine Default SA
-
+### 1. Run Agents Locally
+Use the ADK web interface to interact with your agents individually:
 ```bash
-gcloud projects add-iam-policy-binding genai-apps-25 --member="serviceAccount:service-803095609412@gcp-sa-aiplatform-re.iam.gserviceaccount.com" --role="roles/aiplatform.user"
-```
-
-## How to Run Local and Deploy To Agent Engine:
-
-1. deploy bookings agent to agent engine
-
-```bash
-uv run python bookings/deploy_agent_engine.py
-```
-
-2. start customers agent (ensure `BOOKINGS_ENGINE_ID` is set to your deployed customer agent)
-
-```bash
+# Run Bookings Agent
 uv run adk web --port 8001
+
+# Run Customers Agent
+uv run adk web --port 8002
 ```
 
-3. deploy customers agent to agent engine (ensure `BOOKINGS_ENGINE_ID` is set to your deployed customer agent)
-
+### 2. Run Frontend Locally
+You can run the FastAPI frontend on your local machine. It will proxy requests to your deployed `customers` agent:
 ```bash
-uv run python customers/deploy_agent_engine.py
-```
+export PROJECT_ID=[YOUR_PROJECT_ID]
+export LOCATION=us-central1
+export CUSTOMERS_ENGINE_ID=[YOUR_DEPLOYED_ID]
+export IAP_EXPECTED_AUDIENCE=[YOUR_AUDIENCE]
 
-4. Launch the web interface (ensure `CUSTOMERS_ENGINE_ID` is set to your deployed customer agent):
-
-```bash
 uv run uvicorn fast-api-fe.main:app --reload --port 8080
 ```
+*Note: Local frontend execution bypasses IAP; ensure your local environment has `roles/aiplatform.user` permissions.*
 
-\*more details on how to run & deploy fast-api-fe chat UI — see [fast-api-fe/README.md](fast-api-fe/README.md) for local dev and Cloud Run deployment instructions.
-
-## Deployment to Vertex AI
-
-\*Note make files haven't been fully tested yet. Please use the manual steps above for now.
-
-### 1. Set up CI/CD
-
-To set up your production infrastructure, run `uvx agent-starter-pack setup-cicd`.
-See the [deployment guide](https://googlecloudplatform.github.io/agent-starter-pack/guide/deployment) for details.
-
-### 1. Set up Infrastructure
-
-Initialize GCP resources (Bucket, IAM, etc.):
-
+### 3. Evaluation
+Run automated evalsets to verify agent performance:
 ```bash
-make setup-dev-env
+uv run adk eval --config tests/eval/eval_config.json
 ```
-
-### 2. Deploy Agents
-
-Deploy both agents to Vertex AI Agent Engine (Reasoning Engine):
-
-```bash
-make deploy            # Deploys Bookings Agent
-make deploy-customers  # Deploys Customers Agent
-```
-
-### 3. Deploy Frontend
-
-See [fast-api-fe/README.md](fast-api-fe/README.md) for full Cloud Run deployment instructions.
 
 ---
-
-## Architecture Notes
-
-### How `query_agent` Communicates with Agent Engine
-
-`fast-api-fe/services/agent_client.py` uses the **Vertex AI Agent Engine REST API** via the `vertexai` Python SDK — **not** A2A.
-
-```
-FastAPI app (Cloud Run)
-    ↓
-vertexai Python SDK (google-cloud-aiplatform)
-    ↓  HTTPS REST calls to aiplatform.googleapis.com
-Agent Engine (deployed reasoning engine)
-```
-
-| Call                                   | What it does                                                  |
-| -------------------------------------- | ------------------------------------------------------------- |
-| `agent_engines.get(ENGINE_ID)`         | Returns a **local Python proxy object** — no network call yet |
-| `remote_app.async_create_session(...)` | `POST .../reasoningEngines/{id}/sessions`                     |
-| `remote_app.async_stream_query(...)`   | `POST .../reasoningEngines/{id}:streamQuery`                  |
-
-**Is the connection private?**  
-By default, calls go to `aiplatform.googleapis.com` (a public Google API endpoint). However, traffic from Cloud Run → Google APIs travels over Google's internal infrastructure (GFE), not the raw public internet. Fully private routing can be enforced with **VPC Service Controls** or **Private Google Access**.
-
-## Quick Start Using make created by agent-starter-pack
-
-_Note: make files haven't been fully tested yet. Please use the manual steps above for now._
-
-Install required packages and launch the local development environment:
-
-```bash
-make install && make playground
-```
-
-## Commands
-
-| Command                           | Description                                              |
-| --------------------------------- | -------------------------------------------------------- |
-| `make install`                    | Install dependencies using uv                            |
-| `make playground`                 | Launch local development environment                     |
-| `make lint`                       | Run code quality checks                                  |
-| `make test`                       | Run unit and integration tests                           |
-| `make deploy`                     | Deploy agent to Agent Engine                             |
-| `make register-gemini-enterprise` | Register deployed agent to Gemini Enterprise             |
-| `make inspector`                  | Launch A2A Protocol Inspector                            |
-| `make setup-dev-env`              | Set up development environment resources using Terraform |
-
-For full command options and usage, refer to the [Makefile](Makefile).
-
-## 🛠️ Project Management
-
-| Command                             | What It Does                                                   |
-| ----------------------------------- | -------------------------------------------------------------- |
-| `uvx agent-starter-pack setup-cicd` | One-command setup of entire CI/CD pipeline + infrastructure    |
-| `uvx agent-starter-pack upgrade`    | Auto-upgrade to latest version while preserving customizations |
-| `uvx agent-starter-pack extract`    | Extract minimal, shareable version of your agent               |
-
----
-
-### A2A vs. Agent Engine API — Two Different Hops
-
-```
-FastAPI frontend
-    ↓  Vertex AI SDK / REST    ← agent_client.py uses THIS
-customers agent (Agent Engine)
-    ↓  Vertex AI SDK / Rest    ← customers/agent.py uses THIS.. A2A not fully implemented on customers & bookings agents
-bookings agent (Agent Engine)
-```
-
-- **`agent_client.py`** → Vertex AI Agent Engine API (session + streaming query)
-- **`customers/agent.py`** →Vertex AI SDK (session + streaming query)
-- **`customers/agent.py`** → can try A2A protocol via `AuthedRemoteA2aAgent` → bookings agent e.g. below
-
-```
-# a2a snippet for bookings agent.. currently not using a2a
-
-import datetime
-from zoneinfo import ZoneInfo
-
-from google.adk.agents import Agent
-from google.adk.apps import App
-from google.adk.models import Gemini
-from google.adk.tools import LongRunningFunctionTool
-from google.genai import types
-from google.adk.tools import AgentTool
-from google.adk.agents.remote_a2a_agent import RemoteA2aAgent
-import os
-import httpx
-import google.auth
-from google.auth.transport.requests import Request
-
-class GoogleAuth(httpx.Auth):
-    def __init__(self):
-        self.credentials, self.project_id = google.auth.default(
-            scopes=["https://www.googleapis.com/auth/cloud-platform"]
-        )
-
-    def auth_flow(self, request):
-        if not self.credentials.valid:
-            self.credentials.refresh(Request())
-        request.headers["Authorization"] = f"Bearer {self.credentials.token}"
-        yield request
-
-
-_, project_id = google.auth.default()
-os.environ["GOOGLE_CLOUD_PROJECT"] = "genai-apps-25"
-os.environ["GOOGLE_CLOUD_LOCATION"] = "global"
-os.environ["GOOGLE_GENAI_USE_VERTEXAI"] = "True"
-agent_card=os.getenv("BOOKINGS_AGENT_CARD_URL", "https://us-central1-aiplatform.googleapis.com/v1/projects/genai-apps-25/locations/us-central1/reasoningEngines/9162713079862001664")
-#agent_card=os.getenv("BOOKINGS_AGENT_CARD_URL", "http://127.0.0.1:8000/.well-known/agent-card.json")
-
-def request_user_input(message: str) -> dict:
-    """Request additional input from the user.
-
-    Use this tool when you need more information from the user to complete a task.
-    Calling this tool will pause execution until the user responds.
-
-    Args:
-        message: The question or clarification request to show the user.
-    """
-    return {"status": "pending", "message": message}
-
-class AuthedRemoteA2aAgent(RemoteA2aAgent):
-    async def _ensure_httpx_client(self) -> httpx.AsyncClient:
-        client = await super()._ensure_httpx_client()
-        if client.auth is None:
-            client.auth = GoogleAuth()
-        return client
-
-bookings_agent = AuthedRemoteA2aAgent(
-    "bookings",
-    agent_card=agent_card,
-)
-
-mock_db = {
-    "alice": {"user_id": "u4398", "email": "alice@example.com", "loyalty_tier": "gold"},
-    "bob": {"user_id": "u1023", "email": "bob@example.com", "loyalty_tier": "silver"},
-}
-
-def get_customer(name: str) -> dict:
-    """Gets customer information by name.
-
-    Args:
-        name: The name of the customer to look up.
-
-    Returns:
-        dict: The customer information or all customers.
-    """
-
-    customer = mock_db.get(name.lower())
-    if customer:
-        return {"status": "success", "customer": customer}
-    return {"status": "error", "message": f"Customer '{name}' not found."}
-
-def get_all_customers() -> dict:
-    """Gets all customers."""
-    return {"status": "success", "customers": mock_db}
-
-
-root_agent = Agent(
-    name="customers",
-    model=Gemini(
-        model="gemini-3-flash-preview",
-        retry_options=types.HttpRetryOptions(attempts=3),
-    ),
-    description="Customer management agent. Use this agent to look up customer details.",
-    instruction="""You are the main customer orchestrator. Look up customer details using the `get_customer` or get_all_customers tools.
-    If the user wants to make a booking, look up their user_id first, then delegate to the bookings agent using the `bookings` tool.
-    """,
-    tools=[
-        get_customer,
-        get_all_customers,
-        AgentTool(bookings_agent),
-        LongRunningFunctionTool(func=request_user_input),
-    ],
-)
-
-app = App(
-    root_agent=root_agent,
-    name="customers",
-)
-
-```
+*Reference Guide: @will_end_user_agent_guide.md*
