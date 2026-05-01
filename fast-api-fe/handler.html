@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Authenticating...</title>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+  <style>
+    body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background-color: #f4f5f7; }
+    .container { text-align: center; padding: 30px; border-radius: 8px; background: white; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+    .spinner { margin: 0 auto 20px auto; border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    #login-button { background-color: #0078D4; color: white; border: none; padding: 12px 24px; font-size: 16px; border-radius: 4px; cursor: pointer; margin-top: 20px; transition: background-color 0.2s; }
+    #login-button:hover { background-color: #005a9e; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div id="spinner" class="spinner" style="display: none;"></div>
+    <div id="message">Please sign in to access this application.</div>
+    <button id="login-button">Sign In with Microsoft</button>
+  </div>
+
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const tenantId = urlParams.get('tenantId') || urlParams.get('tid');
+    let redirectUri = urlParams.get('redirect_uri');
+    const originalState = urlParams.get('state');
+
+    if (redirectUri) {
+      try {
+        const url = new URL(redirectUri);
+        if (tenantId && !url.searchParams.has('tenantId')) url.searchParams.append('tenantId', tenantId);
+        redirectUri = url.toString();
+      } catch (e) {
+        console.error("Failed to parse redirectUri", e);
+      }
+    }
+
+    const apiKey = urlParams.get('apiKey');
+    const firebaseConfig = {
+      apiKey: apiKey,
+      authDomain: "{{project_id}}.firebaseapp.com"
+    };
+    
+    if (!firebase.apps.length) {
+      firebase.initializeApp(firebaseConfig);
+    }
+    const auth = firebase.auth();
+    if (tenantId) auth.tenantId = tenantId;
+
+    function updateUI(message, showSpinner = false, showButton = false) {
+      document.getElementById('message').innerHTML = message;
+      document.getElementById('spinner').style.display = showSpinner ? 'block' : 'none';
+      document.getElementById('login-button').style.display = showButton ? 'inline-block' : 'none';
+    }
+
+    document.getElementById('login-button').addEventListener('click', () => {
+      updateUI("Opening login window...", true, false);
+      const provider = new firebase.auth.OAuthProvider('microsoft.com');
+      
+      // Request OIDC scopes to ensure a JWT is returned instead of an opaque token
+      provider.addScope('openid');
+      provider.addScope('profile');
+      provider.addScope('offline_access'); // Request refresh token
+      
+      // Request specific Microsoft Graph scopes
+      provider.addScope('User.Read');
+      provider.addScope('Calendars.ReadWrite');
+      
+      auth.signInWithPopup(provider).then((result) => {
+        updateUI("Authentication successful. Securing your session...", true, false);
+
+        if (redirectUri && originalState) {
+          result.user.getIdToken().then((idToken) => {
+            
+            fetch(redirectUri, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ id_token: idToken, state: originalState })
+            })
+            .then(async (response) => {
+              if (!response.ok) throw new Error(`IAP returned ${response.status}`);
+              const data = await response.json();
+              
+              try {
+                const targetUrl = new URL(data.targetUri);
+                targetUrl.searchParams.append('rt', data.redirectToken);
+                window.location.replace(targetUrl.toString());
+              } catch (e) {
+                throw new Error("Failed to construct GET redirect: " + e.message);
+              }
+              
+            })
+            .catch((error) => {
+              console.error("IAP Request Error:", error);
+              updateUI("<h2>Error</h2><p>Failed to complete IAP authentication.</p>", false, true);
+            });
+            
+          }).catch((error) => {
+             console.error("Token Error:", error);
+             updateUI("<h2>Error</h2><p>Failed to retrieve ID token.</p>", false, true);
+          });
+        } else {
+          updateUI("Logged in, but missing IAP redirect information in the URL.", false, false);
+        }
+      }).catch((error) => {
+        console.error("Authentication Error:", error);
+        if (error.code === 'auth/popup-closed-by-user') {
+          updateUI("Login was cancelled. Please try again.", false, true);
+        } else if (error.code === 'auth/popup-blocked') {
+          updateUI("<h2>Popup Blocked</h2><p>Please allow popups for this site to log in.</p>", false, true);
+        } else {
+          updateUI("<h2>Authentication Error</h2><p>" + error.message + "</p>", false, true);
+        }
+      });
+    });
+  </script>
+</body>
+</html>
+
