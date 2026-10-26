@@ -216,4 +216,8 @@ gcip-config.sh
 # The requirements.txt in fast-api-fe should be generated at build time by the "build.sh" and "build-on-cloud-build.sh" scripts
 fast-api-fe/requirements.txt
 
+# OAuth client secrets
+client_secret_*.json
+
+
 

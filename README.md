@@ -1,4 +1,4 @@
-# Agent Security Patterns: Multi-Agent Customer Booking Assistant
+# Agent Security Patterns: Multi-Agent Orchestrator Assistant
 
 A reference implementation for a secure, multi-agent system on Google Cloud. This project demonstrates how to orchestrate specialized agents while maintaining a hardened security perimeter using **Identity-Aware Proxy (IAP)**, **Identity Platform (GCIP)**, **Cloud Armor (WAF)**, and a **"Before Sign-in" blocking function** for secure Microsoft token vaulting.
 
@@ -9,7 +9,7 @@ This repository implements the following **Agent Security Patterns**:
 - **Perimeter Security:** Cloud Armor protects against WAF threats (SQLi, XSS), while IAP ensures only authenticated users can reach the frontend.
 - **Identity Orchestration:** Google Cloud Identity Platform (GCIP) manages multi-tenant authentication, specifically configured here for Microsoft Entra ID.
 - **Token Vaulting:** A "Before Sign-in" blocking function intercepts Microsoft OAuth tokens (Access & Refresh) during login and securely vaults them in **Secret Manager**, allowing the agents to act on behalf of the user (e.g., managing Outlook Calendars).
-- **Multi-Agent Delegation:** A "Customers" orchestrator agent manages user identity and delegates specialized tasks to a "Bookings" agent via the Vertex AI Agent Engine REST API.
+- **Multi-Agent Delegation:** An "Orchestrator" agent manages user identity and delegates specialized tasks to a "Bookings" agent via the Vertex AI Agent Engine REST API.
 
 ### Architecture Diagram
 
@@ -21,7 +21,7 @@ sequenceDiagram
     participant Blocking as Before Sign-in Handler (Cloud Function)
     participant Secret as Secret Manager
     participant FastAPI as Chat Frontend (Cloud Run)
-    participant Customers as Customers Agent (Orchestrator)
+    participant Orchestrator as Orchestrator Agent (Router)
     participant Bookings as Bookings Agent (Specialized)
     participant Graph as Microsoft Graph API
 
@@ -37,15 +37,15 @@ sequenceDiagram
     end
     IAP->>FastAPI: Forward authenticated request with JWT
 
-    FastAPI->>Customers: query_agent(message + user_identity)
+    FastAPI->>Orchestrator: query_agent(message + user_identity)
     alt Needs Booking
-        Customers->>Bookings: Delegate task
+        Orchestrator->>Bookings: Delegate task
         Bookings->>Secret: Fetch User MS Token
         Bookings->>Graph: Create Calendar Event
-        Bookings-->>Customers: Success
+        Bookings-->>Orchestrator: Success
     end
 
-    Customers-->>FastAPI: Final response
+    Orchestrator-->>FastAPI: Final response
     FastAPI-->>User: Chat Bubble
 ```
 
@@ -65,10 +65,20 @@ sequenceDiagram
    ```bash
    cd setup-scripts
    ./enable-apis.sh
+   sleep 100 # sleep 100 seconds fore the APIs to be enabled and the GCP-managed Service Accounts to be Created
+   ```
+
+   ```bash
+   ./create-service-accounts.sh
+   sleep 60 # sleep around 60 seconds for the custom Service Account creation to finish
+   ```
+
+   ```bash
    ./grant-all.sh
    ./setup-ar-repo.sh
    ./grant-cloud-build-roles.sh
    cd ..
+   ```
    ```
 
 ### 3. Frontend Deployment
@@ -178,17 +188,17 @@ sequenceDiagram
    uv run python bookings/deploy_agent_engine.py
    ```
    Update `BOOKINGS_ENGINE_ID` and `BOOKINGS_PRINCIPAL` in `config.sh`.
-2. Deploy **Customers Agent**:
+2. Deploy **Orchestrator Agent**:
    ```bash
    source config.sh
-   uv run python customers/deploy_agent_engine.py
+   uv run python orchestrator/deploy_agent_engine.py
    ```
-   Update `CUSTOMERS_ENGINE_ID` and `CUSTOMERS_PRINCIPAL` in `config.sh`.
+   Update `ORCHESTRATOR_ENGINE_ID` and `ORCHESTRATOR_PRINCIPAL` in `config.sh`.
 3. Run final permission grants:
    ```bash
    cd setup-scripts
    ./after-agents-deployment-grant.sh
-   ./after-customers-agent-deployment-grant.sh
+   ./after-orchestrator-agent-deployment-grant.sh
    cd ..
    ```
 
@@ -201,7 +211,7 @@ cd fast-api-fe
 
 ## 🧪 Final Validation
 1. Visit your custom domain.
-2. Prompt the agent: *"Make an appointment for a 45 minute haircut for Bob on April 24, 2026"*.
+2. Prompt the agent: *"Make an appointment for a 45 minute haircut on April 24, 2026"*.
 3. **Success Criterion:** Verify a "Success" message in chat and check your [Outlook Calendar](https://outlook.live.com/calendar/) for the new event.
 
 ## 💻 Local Development
@@ -214,16 +224,16 @@ Use the ADK web interface to interact with your agents individually:
 # Run Bookings Agent
 uv run adk web --port 8001
 
-# Run Customers Agent
+# Run Orchestrator Agent
 uv run adk web --port 8002
 ```
 
 ### 2. Run Frontend Locally
-You can run the FastAPI frontend on your local machine. It will proxy requests to your deployed `customers` agent:
+You can run the FastAPI frontend on your local machine. It will proxy requests to your deployed `orchestrator` agent:
 ```bash
 export PROJECT_ID=[YOUR_PROJECT_ID]
 export LOCATION=us-central1
-export CUSTOMERS_ENGINE_ID=[YOUR_DEPLOYED_ID]
+export ORCHESTRATOR_ENGINE_ID=[YOUR_DEPLOYED_ID]
 export IAP_EXPECTED_AUDIENCE=[YOUR_AUDIENCE]
 
 uv run uvicorn fast-api-fe.main:app --reload --port 8080

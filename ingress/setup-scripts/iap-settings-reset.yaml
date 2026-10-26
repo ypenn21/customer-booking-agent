@@ -1,0 +1,7 @@
+# iap-settings-reset.yaml
+access_settings:
+  cors_settings:
+    allow_http_options: false
+  identity_sources: []  # Reverts to default Google identity source
+  # Omitting other fields will cause them to inherit from the parent or use defaults
+

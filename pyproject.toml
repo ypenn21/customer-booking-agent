@@ -1,0 +1,26 @@
+[project]
+name = "agent-security-patterns"
+version = "0.1.0"
+description = "A secure multi-agent system reference implementation"
+requires-python = ">=3.10"
+dependencies = [
+    "bookings",
+    "orchestrator",
+    "fast-api-fe",
+]
+
+[tool.uv.sources]
+bookings = { workspace = true }
+orchestrator = { workspace = true }
+fast-api-fe = { workspace = true }
+
+[tool.uv]
+managed = true
+
+[tool.uv.workspace]
+members = ["bookings", "orchestrator", "fast-api-fe"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+norecursedirs = ["tests/load_test"]

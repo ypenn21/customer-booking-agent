@@ -1,0 +1,6 @@
+accessSettings:
+  gcipSettings:
+    loginPageUri: https://{{domain}}/auth/handler.html?apiKey={{apiKey}}
+    tenantIds:
+    - {{tenantId}}
+
