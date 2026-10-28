@@ -209,3 +209,90 @@ async def test_registry_discovered_a2a_agent_rewrites_card_url_for_mtls() -> Non
         == "https://us-central1-aiplatform.mtls.googleapis.com/v1beta1/projects/48196429354/locations/us-central1/reasoningEngines/697851783812218880/a2a"
     )
     assert captured_async_client_kwargs["verify"] is dummy_ctx
+
+
+def test_registry_discovered_a2a_agent_forwards_full_history_without_worker_ids() -> None:
+    """Verifies multi-turn session history is forwarded in full and context_id/task_id are not pinned."""
+    from google.adk.events.event import Event
+    from google.adk.sessions.session import Session
+    from google.genai import types as genai_types
+
+    card = _create_placeholder_bookings_card("Bookings test description")
+    agent = RegistryDiscoveredA2aAgent(
+        name="bookings",
+        project_id="agent-security-patterns",
+        location="us-central1",
+        agent_card=card,
+        discovered_from_registry=True,
+    )
+
+    assert agent._full_history_when_stateless is True
+
+    turn1_user = Event(
+        author="user",
+        content=genai_types.Content(
+            role="user",
+            parts=[genai_types.Part(text="Book an event for Yanni")],
+        ),
+    )
+    turn1_bookings = Event(
+        author="bookings",
+        content=genai_types.Content(
+            role="model",
+            parts=[genai_types.Part(text="What date and time would you like?")],
+        ),
+        custom_metadata={
+            "a2a:task_id": "0b9aea92-6a5b-48dd-a993-81ddcc9a4c30",
+            "a2a:context_id": "4e6eafa9-d953-41d0-984b-1795684f96ca",
+            "a2a:response": {"status": {"state": "input-required"}},
+        },
+    )
+    turn2_user = Event(
+        author="user",
+        content=genai_types.Content(
+            role="user",
+            parts=[genai_types.Part(text="Nov 11th from 9am to 5pm")],
+        ),
+    )
+
+    session = Session(
+        id="sess-1",
+        app_name="orchestrator",
+        user_id="user-1",
+        events=[turn1_user, turn1_bookings, turn2_user],
+    )
+    mock_ctx = MagicMock()
+    mock_ctx.session = session
+    mock_ctx.isolation_scope = None
+
+    parts, context_id = agent._construct_message_parts_from_session(mock_ctx)
+    assert context_id is None
+    assert agent._get_resumable_task_id(mock_ctx, context_id) is None
+    assert agent._create_a2a_request_for_user_function_response(mock_ctx) is None
+
+    combined_texts = [
+        getattr(p, "text", None) or getattr(getattr(p, "root", None), "text", "")
+        for p in parts
+    ]
+    joined = "\n".join(t for t in combined_texts if t)
+    assert "Book an event for Yanni" in joined
+    assert "What date and time would you like?" in joined
+    assert "Nov 11th from 9am to 5pm" in joined
+
+
+def test_bookings_agent_does_not_use_long_running_request_user_input() -> None:
+    """Verifies bookings/agent.py does not register LongRunningFunctionTool(request_user_input)."""
+    from google.adk.tools import LongRunningFunctionTool
+
+    with patch("vertexai.init"), patch(
+        "google.auth.default", return_value=(MagicMock(), "test-project")
+    ):
+        from bookings.agent import create_agent
+
+        bookings_agent = create_agent()
+
+    for tool in bookings_agent.tools:
+        assert not isinstance(tool, LongRunningFunctionTool)
+        tool_name = getattr(tool, "name", None) or getattr(tool, "__name__", "")
+        assert tool_name != "request_user_input"
+

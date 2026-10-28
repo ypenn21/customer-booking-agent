@@ -24,7 +24,7 @@ from zoneinfo import ZoneInfo
 from google.adk.agents import Agent
 from google.adk.apps import App
 from google.adk.models import Gemini
-from google.adk.tools import FunctionTool, ToolContext, LongRunningFunctionTool
+from google.adk.tools import FunctionTool, ToolContext
 from google.genai import Client, types
 from security import validate_token
 
@@ -292,11 +292,6 @@ def create_calendar_invite(
         }
 
 
-def request_user_input(message: str) -> dict:
-    """Request additional input from the user."""
-    return {"status": "pending", "message": message}
-
-
 class UncachedGemini(Gemini):
     """Subclass of Gemini that prevents long-term caching of the HTTP client.
     
@@ -378,12 +373,11 @@ def create_agent() -> Agent:
         
         RULES:
         1. NEVER guess the date or time.
-        2. If details are missing, use the `request_user_input` tool to ask the user.
+        2. If details are missing, ask the user directly in your response for the required information.
         """,
         tools=[
             make_booking,
             create_calendar_invite,
-            LongRunningFunctionTool(func=request_user_input),
         ],
     )
 

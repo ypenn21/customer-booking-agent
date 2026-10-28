@@ -29,15 +29,23 @@ from a2a.types import (
     AgentCard,
     AgentSkill,
     Message as A2AMessage,
+    Part as A2APart,
     TransportProtocol,
 )
 import google.auth
 from google.auth.transport import mtls
 import google.auth.transport.requests
+from google.adk.a2a.agent._remote_a2a_agent import (
+    A2A_METADATA_PREFIX,
+    _without_credential_parts,
+)
 from google.adk.agents.invocation_context import InvocationContext
 from google.adk.agents.readonly_context import ReadonlyContext
 from google.adk.agents.remote_a2a_agent import RemoteA2aAgent
 from google.adk.events.event import Event
+from google.adk.flows.llm_flows.context._fencing import (
+    _present_other_agent_message,
+)
 from google.adk.integrations.agent_registry import AgentRegistry
 from google.adk.integrations.agent_registry.agent_registry import (
     AGENT_REGISTRY_BASE_URL,
@@ -287,6 +295,7 @@ class RegistryDiscoveredA2aAgent(RemoteA2aAgent):
         target_display_name: str = "Booking Assistant",
         agent_card: Optional[AgentCard] = None,
         discovered_from_registry: bool = False,
+        full_history_when_stateless: bool = True,
         **kwargs: Any,
     ) -> None:
         resolved_card = agent_card or _create_placeholder_bookings_card(description)
@@ -295,12 +304,67 @@ class RegistryDiscoveredA2aAgent(RemoteA2aAgent):
             agent_card=resolved_card,
             description=description,
             a2a_request_meta_provider=forward_user_context_metadata,
+            full_history_when_stateless=full_history_when_stateless,
             **kwargs,
         )
         self._project_id = project_id
         self._location = location
         self._target_display_name = target_display_name
         self._discovered_from_registry = discovered_from_registry
+
+    def _create_a2a_request_for_user_function_response(
+        self, ctx: InvocationContext
+    ) -> Optional[A2AMessage]:
+        """Avoids resuming worker-local A2A task IDs when stateless history forwarding is enabled."""
+        if self._full_history_when_stateless:
+            return None
+        return super()._create_a2a_request_for_user_function_response(ctx)
+
+    def _get_resumable_task_id(
+        self, ctx: InvocationContext, context_id: Optional[str]
+    ) -> Optional[str]:
+        """Prevents attaching worker-local task IDs when stateless history forwarding is enabled."""
+        if self._full_history_when_stateless:
+            return None
+        return super()._get_resumable_task_id(ctx, context_id)
+
+    def _construct_message_parts_from_session(
+        self, ctx: InvocationContext
+    ) -> tuple[list[A2APart], Optional[str]]:
+        """Builds A2A message parts with full session history and no worker-pinned context_id."""
+        if not self._full_history_when_stateless or not ctx.session or not ctx.session.events:
+            return super()._construct_message_parts_from_session(ctx)
+
+        rewritten_events: list[Event] = []
+        for event in ctx.session.events:
+            if self._is_remote_response(event):
+                scrubbed = _without_credential_parts(event)
+                presented = _present_other_agent_message(scrubbed)
+                if presented is not None:
+                    rewritten_events.append(presented)
+            elif event.custom_metadata and (
+                A2A_METADATA_PREFIX + "context_id" in event.custom_metadata
+                or A2A_METADATA_PREFIX + "task_id" in event.custom_metadata
+            ):
+                cleaned_event = event.model_copy(deep=True)
+                if cleaned_event.custom_metadata:
+                    cleaned_event.custom_metadata.pop(
+                        A2A_METADATA_PREFIX + "context_id", None
+                    )
+                    cleaned_event.custom_metadata.pop(
+                        A2A_METADATA_PREFIX + "task_id", None
+                    )
+                rewritten_events.append(cleaned_event)
+            else:
+                rewritten_events.append(event)
+
+        original_events = ctx.session.events
+        try:
+            ctx.session.events = rewritten_events
+            message_parts, _ = super()._construct_message_parts_from_session(ctx)
+            return message_parts, None
+        finally:
+            ctx.session.events = original_events
 
     def _ensure_registry_card_resolved(self) -> None:
         """Resolves the latest AgentCard from Google Cloud Agent Registry if not yet resolved."""
