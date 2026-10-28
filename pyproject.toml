@@ -2,7 +2,7 @@
 name = "agent-security-patterns"
 version = "0.1.0"
 description = "A secure multi-agent system reference implementation"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "bookings",
     "orchestrator",

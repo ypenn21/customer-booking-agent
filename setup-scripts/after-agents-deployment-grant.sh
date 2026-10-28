@@ -1,9 +1,43 @@
 #!/bin/bash
 set -eux
 
-# Run this script AFTER both the orchestrator and booking agents have been deployed
-# Ensure that the Agent Identities have been set in the config.sh file
-source ../config.sh
+# Run this script AFTER both the orchestrator and booking agents have been deployed.
+# If ORCHESTRATOR_PRINCIPAL or BOOKINGS_PRINCIPAL are empty in config.sh, this script
+# automatically discovers the latest deployed Reasoning Engine effective identities.
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "${SCRIPT_DIR}/../config.sh"
+
+discover_principal() {
+    local display_name="$1"
+    local raw_identity
+    raw_identity=$(curl -s -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+        "https://${LOCATION}-aiplatform.googleapis.com/v1beta1/projects/${PROJECT_ID}/locations/${LOCATION}/reasoningEngines" \
+        | jq -r --arg NAME "${display_name}" '
+            [.reasoningEngines[]? | select(.displayName == $NAME)]
+            | sort_by(.createTime)
+            | last
+            | .spec.effectiveIdentity // empty
+        ')
+    if [[ -z "${raw_identity}" ]]; then
+        echo "ERROR: Could not discover effectiveIdentity for Reasoning Engine with displayName='${display_name}'" >&2
+        exit 1
+    fi
+    if [[ "${raw_identity}" == principal://* ]]; then
+        echo "${raw_identity}"
+    else
+        echo "principal://${raw_identity}"
+    fi
+}
+
+if [[ -z "${ORCHESTRATOR_PRINCIPAL:-}" ]]; then
+    echo "Auto-discovering ORCHESTRATOR_PRINCIPAL for '${ORCHESTRATOR_AGENT_DISPLAY_NAME:-Orchestrator Agent}'..."
+    ORCHESTRATOR_PRINCIPAL="$(discover_principal "${ORCHESTRATOR_AGENT_DISPLAY_NAME:-Orchestrator Agent}")"
+fi
+
+if [[ -z "${BOOKINGS_PRINCIPAL:-}" ]]; then
+    echo "Auto-discovering BOOKINGS_PRINCIPAL for '${BOOKINGS_AGENT_DISPLAY_NAME:-Booking Assistant}'..."
+    BOOKINGS_PRINCIPAL="$(discover_principal "${BOOKINGS_AGENT_DISPLAY_NAME:-Booking Assistant}")"
+fi
 
 echo "----------------------------------------------------------------"
 echo "Granting roles to Orchestrator Agent..."

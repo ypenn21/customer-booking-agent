@@ -23,6 +23,14 @@ COMMIT_SHA=$(git rev-parse --short HEAD 2>/dev/null || echo "v1")
 # Submit to Cloud Build from the root
 echo "Submitting build to Cloud Build for project $PROJECT_ID from project root..."
 cd "$PROJECT_ROOT"
+
+if [ -f ".cloudbuild/build-fast-api-fe.yaml.tpl" ]; then
+    CLOUD_BUILD_SA="projects/${PROJECT_ID}/serviceAccounts/${CLOUD_BUILD_RUNNER_SA_EMAIL}"
+    sed -e "s|REPLACE_ME_SA|$CLOUD_BUILD_SA|g" \
+        -e "s|REPLACE_ME_PROJECT_ID|$PROJECT_ID|g" \
+        ".cloudbuild/build-fast-api-fe.yaml.tpl" > ".cloudbuild/build-fast-api-fe.yaml"
+fi
+
 gcloud builds submit --config .cloudbuild/build-fast-api-fe.yaml \
     --substitutions=COMMIT_SHA=$COMMIT_SHA \
     --project=$PROJECT_ID

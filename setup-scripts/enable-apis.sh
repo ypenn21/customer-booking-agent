@@ -56,7 +56,10 @@ gcloud services enable \
   testing.googleapis.com \
   workstations.googleapis.com \
   iap.googleapis.com \
-  identitytoolkit.googleapis.com &
+  identitytoolkit.googleapis.com \
+  networkservices.googleapis.com \
+  networksecurity.googleapis.com \
+  agentregistry.googleapis.com &
 
 wait
 echo "Finished enabling APIs"

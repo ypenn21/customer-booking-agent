@@ -112,12 +112,13 @@ workflow.add_edge("route_request", "customers")
 
 ---
 
-## Migration Risks
+## Migration Risks & Known Production Issues
 
 | Risk | Severity | Mitigation |
 |------|----------|------------|
 | Context Loss during Routing | MED | Ensure the `State` object captures all necessary metadata (tokens, timezone) before routing. |
 | Tool Binding Errors | LOW | ADK 2.0 has stricter tool binding; verify type hints for all function nodes. |
+| Multi-Worker `InMemoryTaskStore` A2A `404 Not Found` | HIGH | See [a2a-in-memory-task-store-404-bug.md](file:///Users/yannipeng/git-projects/agent-security-patterns/plans/migrate-to-adk2/a2a-in-memory-task-store-404-bug.md). When `Bookings` paused a turn in `input-required` state via `LongRunningFunctionTool(func=request_user_input)`, the `task_id` was stored only in one uvicorn worker's `InMemoryTaskStore` (e.g., worker `[16]`). Follow-up turns routed to another worker (e.g., worker `[15]`) failed with A2A `Code=-32001` (`TaskNotFoundError`), which the A2A REST handler returns as HTTP `404 Not Found`. Mitigated by removing `LongRunningFunctionTool(func=request_user_input)` from `bookings/agent.py` so every turn finishes in `completed` state; migrating to an ADK 2.0 graph workflow or shared state store eliminates per-worker state fragmentation altogether. |
 
 ---
 
