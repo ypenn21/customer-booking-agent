@@ -112,13 +112,12 @@ workflow.add_edge("route_request", "customers")
 
 ---
 
-## Migration Risks & Known Production Issues
+## Migration Risks
 
 | Risk | Severity | Mitigation |
 |------|----------|------------|
 | Context Loss during Routing | MED | Ensure the `State` object captures all necessary metadata (tokens, timezone) before routing. |
 | Tool Binding Errors | LOW | ADK 2.0 has stricter tool binding; verify type hints for all function nodes. |
-| Multi-Worker `InMemoryTaskStore` A2A `404 Not Found` & Session Context Loss | HIGH | See [a2a-in-memory-task-store-404-bug.md](file:///Users/yannipeng/git-projects/agent-security-patterns/plans/migrate-to-adk2/a2a-in-memory-task-store-404-bug.md). Previously, `RemoteA2aAgent` truncated outgoing message history at the last `bookings` response and pinned requests to worker-local `task_id` (`InMemoryTaskStore`) and `context_id` (`InMemorySessionService`). When follow-up turns routed to a different uvicorn worker, they failed with HTTP `404 Not Found` (`TaskNotFoundError` `-32001`) or lost Turn 1 context in a blank in-memory session. Mitigated by removing `LongRunningFunctionTool(func=request_user_input)` from [`bookings/agent.py`](file:///Users/yannipeng/git-projects/agent-security-patterns/bookings/agent.py) and overriding history construction on [`RegistryDiscoveredA2aAgent`](file:///Users/yannipeng/git-projects/agent-security-patterns/orchestrator/a2a_discovery.py#L274-L492) to forward the full conversation transcript with `context_id=None` and `task_id=None`. Migrating to an ADK 2.0 graph workflow or shared state store eliminates per-worker state fragmentation altogether. |
 
 ---
 

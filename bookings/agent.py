@@ -176,18 +176,7 @@ def make_booking(service: str, date: str, time: str, tool_context: ToolContext =
         A dictionary containing the mock response from the booking API.
     """
     ctx = get_execution_context()
-    logger.info(f"{ctx} Entering make_booking tool")
-    
-    # This will now raise an error if the user cannot be resolved
-    jwt_user_id = get_jwt_user_id(tool_context)
-
-    try:
-        secret_name = f"ms-tokens-{jwt_user_id}"
-        api_key = get_secret(secret_name)
-        logger.info(f"{ctx} Successfully retrieved API key for {jwt_user_id}")
-    except Exception as e:
-        logger.error(f"{ctx} Error retrieving secret: {e}")
-        return {"status": "error", "message": f"Could not retrieve booking credentials for user {jwt_user_id}."}
+    logger.info(f"{ctx} Entering make_booking tool (mocked)")
 
     # Mock data to simulate API response
     return {
@@ -197,8 +186,6 @@ def make_booking(service: str, date: str, time: str, tool_context: ToolContext =
             "service": service,
             "date": date,
             "time": time,
-            "user_id": jwt_user_id,
-            "authenticated_user_id": jwt_user_id
         },
         "message": "Booking successfully created via mock API."
     }
@@ -214,82 +201,43 @@ def create_calendar_invite(
     location: str = "Google Meet / Microsoft Teams",
     tool_context: ToolContext = None
 ) -> dict:
-    """Creates a Microsoft Calendar invite using the Graph API."""
+    """Creates a mocked Microsoft Calendar invite without calling Secret Manager or Graph API."""
     ctx = get_execution_context()
-    logger.info(f"{ctx} Inside create_calendar_invite tool.")
-    
-    jwt_user_id = get_jwt_user_id(tool_context)
-    
+    logger.info(f"{ctx} Inside create_calendar_invite tool (mocked).")
+
     # ── Timezone Resolution ──────────────────────────────────────────────
     user_timezone = _get_metadata_value(tool_context, "x-user-timezone", "UTC")
-    
-    logger.info(f"{ctx} Creating calendar invite for {jwt_user_id} in timezone {user_timezone}")
 
-    try:
-        access_token = get_access_token(jwt_user_id)
-    except Exception as e:
-        logger.error(f"{ctx} Error retrieving access token: {e}")
-        return {"status": "error", "message": f"Could not retrieve access token: {e}"}
+    logger.info(f"{ctx} Creating mocked calendar invite for '{subject}' in timezone {user_timezone}")
 
-    url = "https://graph.microsoft.com/v1.0/me/events"
-    
-    auth_header = access_token
-    if not str(auth_header).startswith("Bearer "):
-        auth_header = f"Bearer {access_token}"
-        
-    headers = {
-        "Authorization": auth_header,
-        "Content-Type": "application/json"
+    return {
+        "status": "success",
+        "message": f"The event for the **{subject}** has been successfully booked and added to your calendar!",
+        "data": {
+            "subject": subject,
+            "body": body_content,
+            "start": {
+                "dateTime": start_time,
+                "timeZone": user_timezone,
+            },
+            "end": {
+                "dateTime": end_time,
+                "timeZone": user_timezone,
+            },
+            "location": {
+                "displayName": location,
+            },
+            "attendees": [
+                {
+                    "emailAddress": {
+                        "address": attendee_email,
+                        "name": attendee_name,
+                    },
+                    "type": "required",
+                }
+            ],
+        },
     }
-    
-    data = {
-        "subject": subject,
-        "body": {
-            "contentType": "HTML",
-            "content": body_content
-        },
-        "start": {
-            "dateTime": start_time,
-            "timeZone": user_timezone
-        },
-        "end": {
-            "dateTime": end_time,
-            "timeZone": user_timezone
-        },
-        "location": {
-            "displayName": location
-        },
-        "attendees": [
-            {
-                "emailAddress": {
-                    "address": attendee_email,
-                    "name": attendee_name
-                },
-                "type": "required"
-            }
-        ],
-        "allowNewTimeProposals": True,
-        "isOnlineMeeting": True,
-        "onlineMeetingProvider": "teamsForBusiness"
-    }
-
-    try:
-        response = httpx.post(url, headers=headers, json=data)
-        if response.status_code >= 400:
-            logger.error(f"{ctx} Graph API Error {response.status_code}: {response.text}")
-        response.raise_for_status()
-        logger.info(f"{ctx} Calendar invite created successfully for {jwt_user_id}")
-        return {
-            "status": "success",
-            "message": "Calendar invite created successfully.",
-            "data": response.json()
-        }
-    except Exception as e:
-        logger.exception(f"{ctx} Exception in create_calendar_invite: {e}")
-        return {
-            "status": "error",
-            "message": f"Failed to create calendar invite: {e}"
-        }
 
 
 class UncachedGemini(Gemini):
@@ -366,14 +314,36 @@ def create_agent() -> Agent:
         description="An agent that helps users make custom bookings and reservations.",
         instruction="""You are a helpful booking assistant designed to assist users in making reservations and scheduling calendar invites. 
         
-        IMPORTANT: When a user asks to "make a booking", "create a reservation", or "schedule a meeting", you should:
-        1. First, gather all necessary details: service/subject, date, time, and attendee information.
-        2. Use the `create_calendar_invite` tool as the PRIMARY tool to record the booking on the user's Microsoft calendar. This tool is NOT a mock and performs real actions.
-        3. Only use the `make_booking` tool if specifically asked to perform a "legacy booking" or if the calendar invite fails. `make_booking` is currently a mock for demonstration.
+        IMPORTANT: When a user asks to "make a booking", "create a reservation", "book an event", or "schedule a meeting", you should:
+        1. First, gather all necessary details: service/subject, date, time, and attendee information. If the year is not specified in the user's prompt, default to 2024.
+        2. Use the `create_calendar_invite` tool as the PRIMARY tool to record the booking on the user's calendar.
+        3. Only use the `make_booking` tool if specifically asked to perform a "legacy booking" or if the calendar invite fails.
+        4. After calling `create_calendar_invite`, always format your confirmation response using the exact template below:
+
+The event for the **<Event Name>** has been successfully booked and added to your calendar!
+
+### Booking Details:
+- **Event:** <Event Name>
+- **Date:** <Month Day, Year>
+- **Time:** <Start Time> – <End Time>
+- **Attendee:** <Attendee Name> (<Attendee Email>)
+- **Location:** <Location>
+
+        For example, if the user says:
+        "lets book an event for nov 11th for cloud conference from 9am to 5pm. for yanni peng (email yannipeng21@gmail.com)"
+        Respond with:
+The event for the **Cloud Conference** has been successfully booked and added to your calendar!
+
+### Booking Details:
+- **Event:** Cloud Conference
+- **Date:** November 11, 2024
+- **Time:** 9:00 AM – 5:00 PM
+- **Attendee:** Yanni Peng (yannipeng21@gmail.com)
+- **Location:** Google Meet / Microsoft Teams
         
         RULES:
-        1. NEVER guess the date or time.
-        2. If details are missing, ask the user directly in your response for the required information.
+        1. NEVER guess the date or time (except defaulting the year to 2024 if omitted).
+        2. If details are missing, ask the user directly in your response instead of calling any tool.
         """,
         tools=[
             make_booking,
